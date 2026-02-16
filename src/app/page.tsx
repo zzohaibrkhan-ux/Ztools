@@ -104,7 +104,7 @@ export default function Home() {
           transition={{ duration: 0.8, type: "spring" }}
         >
           <h1 className="text-6xl md:text-8xl font-extrabold tracking-tighter text-white mb-2 drop-shadow-2xl">
-            Ztools <span className="text-glow">HUB</span>
+            Ztoolx <span className="text-glow">HUB</span>
           </h1>
           <p className="text-gray-400 tracking-widest uppercase text-sm font-semibold">
             Let me know for more automation apps
