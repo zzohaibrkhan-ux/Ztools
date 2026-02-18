@@ -137,16 +137,17 @@ const formatWordLabel = (word) => {
 
 const AnimatedBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none">
-    <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
+    {/* Transparent base to let global.css body background show through */}
+    <div className="absolute inset-0 bg-transparent" />
     <motion.div
       className="absolute w-[600px] h-[600px] rounded-full opacity-20"
-      style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.4) 0%, transparent 70%)', top: '-10%', right: '-10%' }}
+      style={{ background: 'radial-gradient(circle, rgba(188, 19, 254, 0.3) 0%, transparent 70%)', top: '-10%', right: '-10%' }}
       animate={{ x: [0, 50, 0], y: [0, 30, 0] }}
       transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
     />
     <motion.div
       className="absolute w-[500px] h-[500px] rounded-full opacity-15"
-      style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.4) 0%, transparent 70%)', bottom: '-5%', left: '-5%' }}
+      style={{ background: 'radial-gradient(circle, rgba(0, 243, 255, 0.3) 0%, transparent 70%)', bottom: '-5%', left: '-5%' }}
       animate={{ x: [0, -40, 0], y: [0, -40, 0] }}
       transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
     />
@@ -158,12 +159,12 @@ const CheckboxItem = ({ label, checked, onChange }) => (
     onClick={onChange}
     className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all select-none ${
       checked 
-        ? 'bg-emerald-500/10 border-emerald-500/30 hover:border-emerald-400' 
-        : 'bg-slate-800/50 border-slate-700 hover:border-slate-500'
+        ? 'bg-[var(--neon-blue)]/10 border-[var(--neon-blue)]/30 hover:border-[var(--neon-blue)]' 
+        : 'bg-white/5 border-white/10 hover:border-white/30'
     }`}
   >
     <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border transition-colors ${
-      checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500 bg-slate-900'
+      checked ? 'bg-[var(--neon-blue)] border-[var(--neon-blue)]' : 'border-white/30 bg-transparent'
     }`}>
       {checked && (
         <motion.svg 
@@ -223,19 +224,19 @@ const FilterConfigModal = ({
       onClick={onClose}
     >
       <motion.div
-        className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        className="w-full max-w-2xl glass border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col text-white"
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-slate-700 bg-slate-800/50">
+        <div className="p-6 border-b border-white/10">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-xl font-bold text-white">Filter Configuration</h2>
-              <p className="text-sm text-slate-400 mt-1">Uncheck items to exclude them from the count.</p>
+              <h2 className="text-xl font-bold text-[var(--neon-blue)]">Filter Configuration</h2>
+              <p className="text-sm text-slate-300 mt-1">Uncheck items to exclude them from the count.</p>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-white p-2 hover:bg-slate-700 rounded-full">
+            <button onClick={onClose} className="text-slate-400 hover:text-white p-2 hover:bg-white/10 rounded-full">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -251,33 +252,31 @@ const FilterConfigModal = ({
               placeholder="Search words..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm"
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[var(--neon-blue)] text-sm"
             />
             <div className="flex gap-2 flex-shrink-0">
               <button 
                 onClick={() => setAllVisible(true)}
-                className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-300 transition-colors whitespace-nowrap"
+                className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-white transition-colors whitespace-nowrap"
               >
                 Check All
               </button>
               <button 
                 onClick={() => setAllVisible(false)}
-                className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-300 transition-colors whitespace-nowrap"
+                className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-white transition-colors whitespace-nowrap"
               >
                 Uncheck All
               </button>
             </div>
           </div>
 
-          <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-2 space-y-1 max-h-96 overflow-y-auto">
+          <div className="bg-black/20 border border-white/5 rounded-lg p-2 space-y-1 max-h-96 overflow-y-auto">
             {filteredWords.length === 0 && uniqueWords.length > 0 ? (
               <p className="text-slate-500 text-sm text-center py-4">No words match search.</p>
             ) : uniqueWords.length === 0 ? (
               <p className="text-slate-500 text-sm text-center py-4">Upload a file to see words.</p>
             ) : (
               filteredWords.map(word => {
-                // Default to true (checked) if not in state, UNLESS it's a default excluded type
-                // But our initialization logic handles the default value, so we just read state.
                 const isActive = wordFilterState[word] !== false; 
                 return (
                   <CheckboxItem
@@ -296,10 +295,10 @@ const FilterConfigModal = ({
           </p>
         </div>
 
-        <div className="p-4 bg-slate-800/50 border-t border-slate-700 flex justify-end">
+        <div className="p-4 border-t border-white/10 flex justify-end">
           <motion.button
             onClick={onClose}
-            className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-cyan-600 rounded-lg text-white font-semibold shadow-lg"
+            className="px-6 py-2 bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-purple)] rounded-lg text-white font-semibold shadow-lg"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -324,7 +323,9 @@ const UploadZone = ({ onFilesSelected, isDragging, setIsDragging }) => {
   return (
     <motion.div
       className={`relative overflow-hidden rounded-2xl border-2 border-dashed transition-all duration-300 p-8 text-center ${
-        isDragging ? 'border-emerald-400 bg-emerald-500/10' : 'border-slate-600 hover:border-emerald-500/50 bg-slate-800/30'
+        isDragging 
+          ? 'border-[var(--neon-blue)] bg-[var(--neon-blue)]/10' 
+          : 'border-white/20 hover:border-[var(--neon-purple)]/50 glass'
       }`}
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
       onDragLeave={() => setIsDragging(false)}
@@ -332,17 +333,15 @@ const UploadZone = ({ onFilesSelected, isDragging, setIsDragging }) => {
     >
       <input type="file" ref={fileInputRef} onChange={(e) => onFilesSelected(Array.from(e.target.files))} multiple accept=".xlsx,.xls" className="hidden" />
       
-      <motion.div className="mx-auto w-20 h-20 mb-6 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
-        <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-        </svg>
+      <motion.div className="mx-auto w-20 h-20 mb-6 rounded-2xl bg-gradient-to-br from-[var(--neon-purple)]/20 to-[var(--neon-blue)]/20 flex items-center justify-center">
+        <Upload className="w-10 h-10 text-[var(--neon-blue)]" />
       </motion.div>
 
       <h3 className="text-xl font-semibold text-white mb-2">Drag and drop Excel files</h3>
-      <p className="text-slate-400 mb-6">or click to browse</p>
+      <p className="text-slate-300 mb-6">or click to browse</p>
       <motion.button
         onClick={() => fileInputRef.current?.click()}
-        className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-medium shadow-lg"
+        className="px-6 py-3 rounded-xl bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-purple)] text-white font-medium shadow-lg"
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
       >
@@ -354,24 +353,22 @@ const UploadZone = ({ onFilesSelected, isDragging, setIsDragging }) => {
 
 const FileCard = ({ fileData, onRemove, onOpenSettings }) => (
   <motion.div
-    className="bg-slate-800/60 rounded-2xl border border-slate-700/50 overflow-hidden"
+    className="glass rounded-2xl border border-white/10 overflow-hidden"
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     layout
   >
     <div className="p-5 flex justify-between items-center">
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+        <div className="w-12 h-12 rounded-xl bg-[var(--neon-green)]/20 flex items-center justify-center text-[var(--neon-green)]">
+          <FileSpreadsheet className="w-6 h-6" />
         </div>
         <div>
           <h3 className="text-lg font-semibold text-white">{fileData.fileName}</h3>
           <div className="flex gap-2 text-sm mt-1">
-            <span className="text-emerald-400">{fileData.companyName}</span>
+            <span className="text-[var(--neon-green)]">{fileData.companyName}</span>
             <span className="text-slate-500">•</span>
-            <span className="text-cyan-400">{fileData.stationName}</span>
+            <span className="text-[var(--neon-blue)]">{fileData.stationName}</span>
           </div>
         </div>
       </div>
@@ -379,44 +376,44 @@ const FileCard = ({ fileData, onRemove, onOpenSettings }) => (
       <div className="flex gap-2">
         <motion.button
           onClick={onOpenSettings}
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
           whileHover={{ rotate: 90 }}
           title="Configure Filters"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
+          <Settings className="w-5 h-5" />
         </motion.button>
         <motion.button
           onClick={onRemove}
           className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
+          <Trash2 className="w-5 h-5" />
         </motion.button>
       </div>
     </div>
 
-    <div className="border-t border-slate-700/50 p-5">
-      <h4 className="text-sm font-medium text-slate-400 mb-3">Date-wise Valid Count</h4>
+    <div className="border-t border-white/10 p-5">
+      <h4 className="text-sm font-medium text-slate-300 mb-3">Date-wise Valid Count</h4>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {fileData.counts.map((item, idx) => (
           <motion.div
             key={idx}
-            className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50"
+            className="bg-black/30 rounded-lg p-3 border border-white/5"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: idx * 0.03 }}
           >
             <div className="text-xs text-slate-400 mb-1">{item.date}</div>
-            <div className="text-2xl font-bold text-emerald-400">{item.count}</div>
+            <div className="text-2xl font-bold text-[var(--neon-blue)]">{item.count}</div>
           </motion.div>
         ))}
       </div>
     </div>
   </motion.div>
+);
+
+// Added Trash2 import to fix missing import error in original snippet logic
+const Trash2 = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
 );
 
 // ============================================
@@ -498,15 +495,15 @@ export default function Home() {
   const handleRemoveFile = (id) => setFiles(prev => prev.filter(f => f.id !== id));
 
   return (
-    <div className="min-h-screen bg-slate-950 relative text-white">
+    <div className="min-h-screen bg-transparent relative text-white">
       <AnimatedBackground />
       
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-12">
         <motion.header className="text-center mb-12" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
-            Excel Data Processor
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-glow text-[var(--neon-blue)]">
+            Scheduling Visbility Processor
           </h1>
-          <p className="text-slate-400">Upload, filter, and analyze your Excel data dynamically</p>
+          <p className="text-slate-300">Upload, filter, and analyze your Excel data dynamically</p>
         </motion.header>
 
         <div className="mb-8">
@@ -525,11 +522,9 @@ export default function Home() {
           >
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm transition-colors"
+              className="flex items-center gap-2 px-4 py-2 glass hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-white"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
+              <Settings className="w-4 h-4" />
               Edit Filters
             </button>
           </motion.div>

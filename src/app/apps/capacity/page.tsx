@@ -474,28 +474,31 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+    // Removed default backgrounds to allow global.css body background to show
+    <div className="min-h-screen flex flex-col">
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50">
-              Excel File Compiler
+            {/* Applied text-glow utility from global.css */}
+            <h1 className="text-4xl font-bold text-white text-glow">
+              Capacity Compiler
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-slate-300">
               Compile multiple capacity reliability files into one document - 100% Client-side Processing
             </p>
           </div>
 
-          <Card>
+          {/* Applied glass utility from global.css */}
+          <Card className="glass border-[var(--neon-blue)]/20 hover:border-[var(--neon-blue)]/40 transition-all">
             <CardHeader>
-              <CardTitle>Upload Files</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-white">Upload Files</CardTitle>
+              <CardDescription className="text-slate-300">
                 Drag and drop Excel files or click to select multiple files. All processing happens in your browser - no data leaves your device.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div
-                className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-12 text-center transition-colors hover:border-slate-400 dark:hover:border-slate-600 cursor-pointer"
+                className="border-2 border-dashed border-[var(--neon-blue)]/30 rounded-lg p-12 text-center transition-colors hover:border-[var(--neon-blue)] cursor-pointer bg-white/5"
                 onDragOver={onDragOver}
                 onDragLeave={onDragLeave}
                 onDrop={onDrop}
@@ -509,11 +512,12 @@ export default function Home() {
                   className="hidden"
                 />
                 <label htmlFor="fileInput" className="cursor-pointer">
-                  <Upload className="w-16 h-16 mx-auto mb-4 text-slate-400" />
-                  <p className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  {/* Applied neon blue color */}
+                  <Upload className="w-16 h-16 mx-auto mb-4 text-[var(--neon-blue)]" />
+                  <p className="text-lg font-medium text-white mb-2">
                     Drop files here or click to browse
                   </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-500">
+                  <p className="text-sm text-slate-400">
                     Supports .xlsx and .xls files
                   </p>
                 </label>
@@ -522,7 +526,7 @@ export default function Home() {
               {files.length > 0 && (
                 <div className="mt-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-50">
+                    <h3 className="font-semibold text-white">
                       Files Queue ({files.length})
                     </h3>
                     <div className="flex gap-2">
@@ -531,6 +535,7 @@ export default function Home() {
                         size="sm"
                         onClick={clearAll}
                         disabled={isProcessing}
+                        className="border-white/20 text-white hover:bg-white/10 hover:text-white"
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
                         Clear All
@@ -538,6 +543,7 @@ export default function Home() {
                       <Button
                         onClick={compileFiles}
                         disabled={isProcessing || files.length === 0}
+                        className="bg-[var(--neon-blue)] text-black hover:bg-[var(--neon-blue)]/80"
                       >
                         {isProcessing ? (
                           <>
@@ -556,16 +562,16 @@ export default function Home() {
 
                   <div className="space-y-2 max-h-96 overflow-y-auto">
                     {files.map((file, index) => (
-                      <Card key={index}>
+                      <Card key={index} className="bg-white/5 border-white/10">
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <FileSpreadsheet className="w-5 h-5 text-green-600 flex-shrink-0" />
-                                <p className="font-medium text-slate-900 dark:text-slate-50 truncate">
+                                <FileSpreadsheet className="w-5 h-5 text-[var(--neon-green)] flex-shrink-0" />
+                                <p className="font-medium text-white truncate">
                                   {file.name}
                                 </p>
-                                <p className="text-sm text-slate-500 dark:text-slate-500">
+                                <p className="text-sm text-slate-400">
                                   ({(file.size / 1024).toFixed(1)} KB)
                                 </p>
                               </div>
@@ -576,6 +582,7 @@ export default function Home() {
                               variant="ghost"
                               onClick={() => removeFile(index)}
                               disabled={isProcessing}
+                              className="text-slate-400 hover:text-white hover:bg-white/10"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -586,15 +593,15 @@ export default function Home() {
                   </div>
 
                   {compiledFileUrl && !showPreview && (
-                    <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
+                    <Card className="border-[var(--neon-green)]/30 bg-[var(--neon-green)]/10">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                            <p className="font-medium text-green-900 dark:text-green-100">
+                            <CheckCircle className="w-5 h-5 text-[var(--neon-green)]" />
+                            <p className="font-medium text-white">
                               Compilation Complete!
                             </p>
-                            <p className="text-sm text-green-700 dark:text-green-300">
+                            <p className="text-sm text-slate-300">
                               {files.length} file(s) compiled successfully
                             </p>
                           </div>
@@ -603,6 +610,7 @@ export default function Home() {
                               size="sm"
                               variant="outline"
                               onClick={() => setShowPreview(true)}
+                              className="border-white/20 text-white hover:bg-white/10"
                             >
                               <Eye className="w-4 h-4 mr-2" />
                               Preview
@@ -610,6 +618,7 @@ export default function Home() {
                             <Button
                               onClick={downloadCompiledFile}
                               size="sm"
+                              className="bg-[var(--neon-purple)] text-white hover:bg-[var(--neon-purple)]/80"
                             >
                               <Download className="w-4 h-4 mr-2" />
                               Download
@@ -624,15 +633,15 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+          <Card className="glass border-[var(--neon-purple)]/20">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
-                <FileSpreadsheet className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                <FileSpreadsheet className="w-6 h-6 text-[var(--neon-purple)] flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  <p className="text-sm font-medium text-white">
                     All Processing Happens in Your Browser
                   </p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <p className="text-sm text-slate-300">
                     Your data never leaves your device. All Excel files are processed client-side for maximum privacy and security.
                   </p>
                 </div>
@@ -642,12 +651,12 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Preview Dialog */}
+      {/* Preview Dialog - Dark Mode with White Text */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="!w-[98vw] !max-w-[98vw] max-h-[90vh] overflow-hidden p-0 bg-white text-black">
-          <DialogHeader className="p-4 border-b">
-            <DialogTitle className="text-black">Compiled Data Preview</DialogTitle>
-            <DialogDescription className="text-black">
+        <DialogContent className="!w-[98vw] !max-w-[98vw] max-h-[90vh] overflow-hidden p-0 bg-[#0f0f2d]/95 backdrop-blur-xl border border-[var(--neon-blue)]/30 text-white">
+          <DialogHeader className="p-4 border-b border-white/10">
+            <DialogTitle className="text-[var(--neon-blue)] text-glow">Compiled Data Preview</DialogTitle>
+            <DialogDescription className="text-slate-300">
               Review the compiled data before downloading. Showing {compiledData?.length || 0} rows from {files.length} file(s).
             </DialogDescription>
           </DialogHeader>
@@ -656,32 +665,33 @@ export default function Home() {
             <div className="min-w-full overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-b border-gray-200">
-                    <TableHead className="whitespace-nowrap min-w-[100px] text-black font-semibold">Date</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[60px] text-black font-semibold">Week#</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[150px] text-black font-semibold">Capacity reliability score</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[120px] text-black font-semibold">Completed routes</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[140px] text-black font-semibold">Amazon paid cancels</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[130px] text-black font-semibold">DSP dropped routes</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[130px] text-black font-semibold">Reliability target</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[110px] text-black font-semibold">Route target</TableHead>
+                  <TableRow className="border-b border-white/20 hover:bg-transparent">
+                    <TableHead className="whitespace-nowrap min-w-[100px] text-white font-semibold">Date</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[60px] text-white font-semibold">Week#</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[150px] text-white font-semibold">Capacity reliability score</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[120px] text-white font-semibold">Completed routes</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[140px] text-white font-semibold">Amazon paid cancels</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[130px] text-white font-semibold">DSP dropped routes</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[130px] text-white font-semibold">Reliability target</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[110px] text-white font-semibold">Route target</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {compiledData?.map((row, index) => (
-                    <TableRow key={index} className="border-b border-gray-100">
-                      <TableCell className="whitespace-nowrap font-medium text-black">{formatDate(row.Date)}</TableCell>
-                      <TableCell className="whitespace-nowrap text-black">{row['Week#']}</TableCell>
-                      <TableCell className="whitespace-nowrap text-black">
+                    <TableRow key={index} className="border-b border-white/10 hover:bg-white/5">
+                      {/* Changed text colors to white/slate-200 for visibility */}
+                      <TableCell className="whitespace-nowrap font-medium text-white">{formatDate(row.Date)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-slate-200">{row['Week#']}</TableCell>
+                      <TableCell className="whitespace-nowrap text-slate-200">
                         {typeof row['Capacity reliability score'] === 'number' 
                           ? `${(row['Capacity reliability score'] * 100).toFixed(1)}%` 
                           : '-'}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-black">{row['Completed routes'] ?? '-'}</TableCell>
-                      <TableCell className="whitespace-nowrap text-black">{row['Amazon paid cancels'] ?? '-'}</TableCell>
-                      <TableCell className="whitespace-nowrap text-black">{row['DSP dropped routes'] ?? '-'}</TableCell>
-                      <TableCell className="whitespace-nowrap text-black">{row['Reliability target'] ?? '-'}</TableCell>
-                      <TableCell className="whitespace-nowrap text-black">{row['Route target'] ?? '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-slate-200">{row['Completed routes'] ?? '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-slate-200">{row['Amazon paid cancels'] ?? '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-slate-200">{row['DSP dropped routes'] ?? '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-slate-200">{row['Reliability target'] ?? '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-slate-200">{row['Route target'] ?? '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -689,16 +699,18 @@ export default function Home() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="flex gap-2 p-4 border-t bg-white">
+          <DialogFooter className="flex gap-2 p-4 border-t border-white/10">
             <Button
               variant="outline"
               onClick={() => setShowPreview(false)}
+              className="border-white/20 text-white hover:bg-white/10 hover:text-white"
             >
               Close
             </Button>
             <Button
               onClick={downloadCompiledFile}
               disabled={!compiledFileUrl}
+              className="bg-[var(--neon-blue)] text-black hover:bg-[var(--neon-blue)]/80"
             >
               <Download className="w-4 h-4 mr-2" />
               Download Compiled File
