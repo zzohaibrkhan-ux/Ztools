@@ -2,6 +2,12 @@
 
 import { useState, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+// importing the legacy build fixes the "Module not found" and SSR issues in Next.js
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+
+// Set the worker source. You can use the CDN link or the local file if you copied it.
+// Using the CDN link matching the legacy build version is often easiest for deployment.
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // Types
 type ViewState = 'upload' | 'processing' | 'results' | 'error';
@@ -29,13 +35,6 @@ export default function PDFToExcelConverter() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load pdf.js dynamically to avoid SSR issues
-  const loadPdfJs = useCallback(async () => {
-    const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    return pdfjsLib;
-  }, []);
-
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -57,7 +56,7 @@ export default function PDFToExcelConverter() {
     setStatusText('Loading PDF file...');
 
     try {
-      const pdfjsLib = await loadPdfJs();
+      // Using the imported library directly
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
@@ -231,21 +230,20 @@ export default function PDFToExcelConverter() {
   };
 
   return (
-    /* Added 'dark' class here to enforce dark mode variables from global.css */
-    <main className="dark relative z-10 min-h-screen px-4 py-8 md:py-12">
+    <main className="relative z-10 min-h-screen px-4 py-8 md:py-12">
       <div className="max-w-5xl mx-auto">
         
         {/* Header */}
         <header className="text-center mb-12 fade-in">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border border-white/10 mb-6">
             <span className="w-2 h-2 rounded-full bg-[var(--neon-blue)] animate-pulse"></span>
-            <span className="text-sm text-muted-foreground font-mono">• No Upload Limits • Client-Side Processing</span>
+            <span className="text-sm text-slate-300 font-mono">• No Upload Limits • Client-Side Processing</span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold mb-4 tracking-tight text-foreground">
+          <h1 className="text-4xl md:text-6xl font-bold mb-4 tracking-tight text-white">
             PDF to Excel<br />
             <span className="text-[var(--neon-blue)] text-glow">Converter</span>
           </h1>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+          <p className="text-slate-300 text-lg max-w-xl mx-auto">
             Extract tables from PDF files and convert them to Excel spreadsheets. 
             All processing happens in your browser - your files never leave your device.
           </p>
@@ -256,7 +254,7 @@ export default function PDFToExcelConverter() {
           <section className="mb-8 fade-in stagger-1">
             <div
               className={`glass rounded-2xl p-8 md:p-12 text-center cursor-pointer border-2 border-dashed transition-all duration-300 ${
-                isDragging ? 'border-[var(--neon-purple)] bg-[var(--neon-purple)]/10 scale-105' : 'border-border hover:border-[var(--neon-blue)]'
+                isDragging ? 'border-[var(--neon-purple)] bg-[var(--neon-purple)]/10 scale-[1.02]' : 'border-white/10 hover:border-[var(--neon-blue)]'
               }`}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
@@ -281,18 +279,18 @@ export default function PDFToExcelConverter() {
                 </svg>
               </div>
               
-              <h3 className="text-xl font-semibold mb-2 text-foreground">Drop your PDF here</h3>
-              <p className="text-muted-foreground mb-4">or click to browse your files</p>
+              <h3 className="text-xl font-semibold mb-2 text-white">Drop your PDF here</h3>
+              <p className="text-slate-400 mb-4">or click to browse your files</p>
               
-              <div className="inline-flex items-center gap-4 text-sm text-muted-foreground font-mono">
+              <div className="inline-flex items-center gap-4 text-sm text-slate-400 font-mono">
                 <span className="flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-[var(--neon-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   PDF files only
                 </span>
                 <span className="flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-[var(--neon-purple)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   Secure & Private
@@ -305,7 +303,7 @@ export default function PDFToExcelConverter() {
         {/* Processing Section */}
         {view === 'processing' && fileInfo && (
           <section className="mb-8 fade-in">
-            <div className="glass rounded-2xl p-6 mb-6 border border-border">
+            <div className="glass rounded-2xl p-6 mb-6 border border-white/10">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-[var(--neon-purple)]/20 flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-[var(--neon-purple)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -313,11 +311,11 @@ export default function PDFToExcelConverter() {
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold truncate text-foreground">{fileInfo.name}</h4>
-                  <p className="text-sm text-muted-foreground font-mono">{fileInfo.size}</p>
+                  <h4 className="font-semibold truncate text-white">{fileInfo.name}</h4>
+                  <p className="text-sm text-slate-400 font-mono">{fileInfo.size}</p>
                 </div>
-                <button onClick={resetApp} className="p-2 rounded-lg hover:bg-secondary transition-colors" aria-label="Remove file">
-                  <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button onClick={resetApp} className="p-2 rounded-lg hover:bg-white/10 transition-colors" aria-label="Remove file">
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -326,13 +324,13 @@ export default function PDFToExcelConverter() {
 
             <div className="mb-6">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-muted-foreground">Processing...</span>
-                <span className="text-sm font-medium font-mono text-foreground">{Math.round(progress)}%</span>
+                <span className="text-sm text-slate-300">Processing...</span>
+                <span className="text-sm font-medium font-mono text-white">{Math.round(progress)}%</span>
               </div>
-              <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                <div className="h-full rounded-full bg-[var(--neon-blue)] transition-all duration-300 shadow-[0_0_15px_var(--neon-blue)]" style={{ width: `${progress}%` }}></div>
+              <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-purple)] transition-all duration-300 shadow-[0_0_15px_var(--neon-blue)]" style={{ width: `${progress}%` }}></div>
               </div>
-              <p className="text-xs text-muted-foreground mt-2 font-mono">{statusText}</p>
+              <p className="text-xs text-slate-400 mt-2 font-mono">{statusText}</p>
             </div>
           </section>
         )}
@@ -348,9 +346,9 @@ export default function PDFToExcelConverter() {
                 { label: 'Rows', value: stats.rows },
                 { label: 'Cells', value: stats.cells },
               ].map((stat) => (
-                <div key={stat.label} className="glass rounded-xl p-4 text-center border border-border">
+                <div key={stat.label} className="glass rounded-xl p-4 text-center border border-white/10">
                   <p className="text-2xl font-bold text-[var(--neon-blue)]">{stat.value.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -358,15 +356,14 @@ export default function PDFToExcelConverter() {
             {/* Preview */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-foreground">Data Preview</h3>
-                <span className="text-sm text-muted-foreground font-mono">
+                <h3 className="text-lg font-semibold text-white">Data Preview</h3>
+                <span className="text-sm text-slate-400 font-mono">
                   Showing first 10 rows
                 </span>
               </div>
-              {/* Table text color is now fixed by the 'dark' class on main */}
-              <div className="glass rounded-xl overflow-hidden overflow-x-auto border border-border">
-                <table className="w-full text-sm text-left text-foreground">
-                  <thead className="text-xs uppercase bg-secondary/50 text-secondary-foreground">
+              <div className="glass rounded-xl overflow-hidden overflow-x-auto border border-white/10">
+                <table className="w-full text-sm text-left text-white">
+                  <thead className="text-xs uppercase bg-white/5 text-slate-300 sticky top-0 backdrop-blur-sm">
                     <tr>
                       {extractedData[0]?.map((_, i) => (
                         <th key={i} className="px-4 py-3">Column {i + 1}</th>
@@ -375,9 +372,9 @@ export default function PDFToExcelConverter() {
                   </thead>
                   <tbody>
                     {extractedData.slice(0, 10).map((row, i) => (
-                      <tr key={i} className="border-t border-border hover:bg-secondary/30 transition-colors">
+                      <tr key={i} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                         {row.map((cell, j) => (
-                          <td key={j} className="px-4 py-3 whitespace-nowrap">{cell || ''}</td>
+                          <td key={j} className="px-4 py-3 whitespace-nowrap text-slate-200">{cell || ''}</td>
                         ))}
                       </tr>
                     ))}
@@ -388,13 +385,13 @@ export default function PDFToExcelConverter() {
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <button onClick={downloadExcel} className="flex-1 px-6 py-4 rounded-xl font-semibold flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
+              <button onClick={downloadExcel} className="flex-1 px-6 py-4 rounded-xl font-semibold flex items-center justify-center gap-2 bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-purple)] text-white hover:opacity-90 transition-all shadow-lg shadow-[var(--neon-blue)]/20">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 Download Excel File
               </button>
-              <button onClick={resetApp} className="px-6 py-4 rounded-xl font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+              <button onClick={resetApp} className="px-6 py-4 rounded-xl font-medium glass border border-white/10 text-white hover:bg-white/10 transition-colors">
                 Convert Another File
               </button>
             </div>
@@ -404,13 +401,13 @@ export default function PDFToExcelConverter() {
         {/* Error Section */}
         {view === 'error' && (
           <section className="fade-in">
-            <div className="glass rounded-2xl p-6 text-center border border-destructive">
-              <svg className="w-12 h-12 mx-auto mb-4 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="glass rounded-2xl p-6 text-center border border-red-500/30 bg-red-500/5">
+              <svg className="w-12 h-12 mx-auto mb-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <h3 className="text-xl font-semibold mb-2 text-foreground">Conversion Failed</h3>
-              <p className="text-muted-foreground mb-4">{errorMessage}</p>
-              <button onClick={resetApp} className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors">
+              <h3 className="text-xl font-semibold mb-2 text-white">Conversion Failed</h3>
+              <p className="text-slate-300 mb-4">{errorMessage}</p>
+              <button onClick={resetApp} className="px-6 py-3 rounded-xl bg-[var(--neon-purple)] text-white font-medium hover:bg-[var(--neon-purple)]/80 transition-colors">
                 Try Again
               </button>
             </div>
@@ -419,26 +416,26 @@ export default function PDFToExcelConverter() {
 
         {/* Features */}
         <section className="mt-16 fade-in stagger-3">
-          <h2 className="text-2xl font-bold text-center mb-8 text-foreground">How It Works</h2>
+          <h2 className="text-2xl font-bold text-center mb-8 text-white text-glow">How It Works</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               { title: 'Upload PDF', desc: 'Drag and drop or select your PDF file containing tables you want to extract.' },
               { title: 'Auto Detection', desc: 'Our algorithm analyzes the document structure and identifies tabular data automatically.' },
               { title: 'Download Excel', desc: 'Get your data in a clean Excel file ready for editing, analysis, or reporting.' },
             ].map((feature, index) => (
-              <div key={index} className="glass rounded-xl p-6 border border-border hover:border-[var(--neon-blue)] transition-colors">
+              <div key={index} className="glass rounded-xl p-6 border border-white/10 hover:border-[var(--neon-blue)]/50 transition-colors">
                 <div className="w-10 h-10 rounded-lg bg-[var(--neon-blue)]/10 flex items-center justify-center mb-4">
                   <span className="text-[var(--neon-blue)] font-bold">{index + 1}</span>
                 </div>
-                <h3 className="font-semibold mb-2 text-foreground">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.desc}</p>
+                <h3 className="font-semibold mb-2 text-white">{feature.title}</h3>
+                <p className="text-sm text-slate-300">{feature.desc}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* Footer */}
-        <footer className="mt-16 text-center text-sm text-muted-foreground">
+        <footer className="mt-16 text-center text-sm text-slate-500">
           <p>All processing happens locally in your browser. Your files are never uploaded to any server.</p>
         </footer>
       </div>
