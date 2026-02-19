@@ -47,6 +47,21 @@ export default function PDFToExcelConverter() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Helper to normalize date to MM/DD/YYYY
+  const normalizeDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    // Check for M/D/YYYY or MM/DD/YYYY
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const [month, day, year] = parts;
+      // Pad with leading zero if single digit
+      const paddedMonth = month.padStart(2, '0');
+      const paddedDay = day.padStart(2, '0');
+      return `${paddedMonth}/${paddedDay}/${year}`;
+    }
+    return dateStr;
+  };
+
   const handleFile = async (file: File) => {
     if (file.type !== 'application/pdf') {
       setErrorMessage('Please upload a valid PDF file.');
@@ -211,7 +226,14 @@ export default function PDFToExcelConverter() {
     rows.forEach(row => {
       const newRow = TARGET_HEADERS.map(header => {
         const idx = map[header];
-        return row[idx] || '';
+        let cellValue = row[idx] || '';
+        
+        // Format date column
+        if (header === 'date') {
+          cellValue = normalizeDate(cellValue);
+        }
+        
+        return cellValue;
       });
       
       const isEmpty = newRow.every(cell => cell.trim() === '');
@@ -264,9 +286,24 @@ export default function PDFToExcelConverter() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(extractedData);
     const currencyFormat = '"$"#,##0.00';
+    const shortDateFormat = 'mm/dd/yyyy';
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
     
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      // Date Column (Index 0)
+      const dateCellAddress = XLSX.utils.encode_cell({ r: R, c: 0 });
+      if (ws[dateCellAddress]) {
+        const val = ws[dateCellAddress].v;
+        const dateObj = new Date(val as string);
+        // Only format if it's a valid date
+        if (!isNaN(dateObj.getTime())) {
+            ws[dateCellAddress].t = 'd'; // Set type to date
+            ws[dateCellAddress].v = dateObj;
+            ws[dateCellAddress].z = shortDateFormat; // Set format mask
+        }
+      }
+
+      // Rate Column (Index 2)
       const rateCellAddress = XLSX.utils.encode_cell({ r: R, c: 2 });
       if (ws[rateCellAddress]) {
         const val = ws[rateCellAddress].v;
@@ -275,6 +312,7 @@ export default function PDFToExcelConverter() {
         ws[rateCellAddress].z = currencyFormat;
       }
 
+      // Quantity Column (Index 3)
       const qtyCellAddress = XLSX.utils.encode_cell({ r: R, c: 3 });
       if (ws[qtyCellAddress]) {
         const val = ws[qtyCellAddress].v;
@@ -282,6 +320,7 @@ export default function PDFToExcelConverter() {
         ws[qtyCellAddress].v = parseNumber(val as string);
       }
 
+      // Amount Column (Index 4)
       const amountCellAddress = XLSX.utils.encode_cell({ r: R, c: 4 });
       if (ws[amountCellAddress]) {
         const val = ws[amountCellAddress].v;
@@ -291,7 +330,7 @@ export default function PDFToExcelConverter() {
       }
     }
 
-    const colWidths = [{ wch: 15 }, { wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 15 }];
+    const colWidths = [{ wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 15 }];
     ws['!cols'] = colWidths;
 
     XLSX.utils.book_append_sheet(wb, ws, 'Extracted Data');
