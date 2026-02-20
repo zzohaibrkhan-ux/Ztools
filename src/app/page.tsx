@@ -56,6 +56,13 @@ const apps = [
     href: "/apps/variable",
     color: "#bc13fe"
   },
+  {
+    title: "Amazon Fleet Invoice",
+    desc: "Convert Fleet Amazon Invoice",
+    icon: "🚚",
+    href: "/apps/fleet",
+    color: "#fe131f"
+  },
 ];
 
 export default function Home() {
