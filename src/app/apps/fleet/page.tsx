@@ -91,6 +91,7 @@ export default function PDFToExcelConverter() {
       // State variables
       let mode = 'search_summary_1';
       
+      // Accumulator Arrays - Passed by reference to processing functions
       let prepayRows: string[][] = [];
       let reconRows: string[][] = [];
       let summaryRows: string[][] = [];
@@ -102,7 +103,7 @@ export default function PDFToExcelConverter() {
       let reconHeaderMap: { [key: string]: number } | null = null;
       let foundReconHeader = false;
 
-      // Buffers for Summary tables
+      // Summary specific buffers
       let summaryTable1: string[][] = [];
       let summaryTable2: string[][] = [];
       let summaryTable3: string[][] = [];
@@ -137,7 +138,6 @@ export default function PDFToExcelConverter() {
           } 
           else if (mode === 'extract_summary_1') {
              if (rowText.includes('reconciliation for prior month')) {
-                 // Finish Table 1, Start Table 2
                  mode = 'extract_summary_2';
                  summaryTable2.push(['RECONCILIATION FOR PRIOR MONTH', 'Amount']);
              } else {
@@ -147,7 +147,6 @@ export default function PDFToExcelConverter() {
           }
           else if (mode === 'extract_summary_2') {
               if (rowText.includes('total')) {
-                  // Finish Table 2, Start Table 3
                   mode = 'extract_summary_3';
                   summaryTable3.push(['TOTAL', 'Amount']);
               } else {
@@ -157,14 +156,12 @@ export default function PDFToExcelConverter() {
           }
           else if (mode === 'extract_summary_3') {
               if (rowText.includes('invoice')) {
-                  // Finish Summary Phase completely, move to Prepay
                   mode = 'prepay';
                   
-                  // Compile Summary Sheet with gaps
                   summaryRows = [...summaryTable1];
-                  summaryRows.push([], []); // Gap
+                  summaryRows.push([], []); 
                   summaryRows = summaryRows.concat(summaryTable2);
-                  summaryRows.push([], []); // Gap
+                  summaryRows.push([], []); 
                   summaryRows = summaryRows.concat(summaryTable3);
                   
               } else {
@@ -173,11 +170,9 @@ export default function PDFToExcelConverter() {
               }
           }
 
-          // --- 2. PREPAY PROCESSING (Preserved Logic) ---
+          // --- 2. PREPAY PROCESSING ---
           else if (mode === 'prepay') {
-            if (stopPrepayProcessing) {
-                // If stopped, we skip to next logic check (Recon search)
-            } else {
+            if (!stopPrepayProcessing) {
                 if (!foundPrepayHeader) {
                     const detectedMap = detectHeaderRow(row, PREPAY_HEADER_CONFIG, 4);
                     if (detectedMap) {
@@ -186,18 +181,18 @@ export default function PDFToExcelConverter() {
                         
                         prepayRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Monthly Rate', 'Prepaid Amount']);
                         
+                        // Pass prepayRows by reference
                         const remainingRows = rawRows.slice(r + 1);
-                        const { extracted, stop } = processPrepayRows(remainingRows, prepayHeaderMap);
-                        prepayRows = prepayRows.concat(extracted);
+                        const { stop } = processPrepayRows(remainingRows, prepayHeaderMap, prepayRows);
                         if(stop) {
                             stopPrepayProcessing = true;
-                            mode = 'recon'; // Switch to recon immediately
+                            mode = 'recon';
                         }
-                        continue; // Continue to next row in loop (though we sliced, loop continues for next page iteration mostly)
+                        continue; 
                     }
                 } else {
-                    const { extracted, stop } = processPrepayRows([row], prepayHeaderMap!);
-                    prepayRows = prepayRows.concat(extracted);
+                    // Pass prepayRows by reference
+                    const { stop } = processPrepayRows([row], prepayHeaderMap!, prepayRows);
                     if(stop) {
                         stopPrepayProcessing = true;
                         mode = 'recon';
@@ -206,9 +201,7 @@ export default function PDFToExcelConverter() {
             }
           }
 
-          // --- 3. RECON PROCESSING (Preserved Logic) ---
-          // Note: We search for recon header regardless of 'mode' once prepay is done, 
-          // or strictly follow mode='recon'
+          // --- 3. RECON PROCESSING ---
           if (mode === 'recon') {
               if (!foundReconHeader) {
                   const detectedMap = detectHeaderRow(row, RECON_HEADER_CONFIG, 5);
@@ -218,14 +211,13 @@ export default function PDFToExcelConverter() {
                       
                       reconRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Actual Quantity', 'Reconciled Quantity', 'Monthly Rate', 'Reconciliation Amount']);
                       
+                      // Pass reconRows by reference
                       const remainingRows = rawRows.slice(r + 1);
-                      const { extracted } = processReconRows(remainingRows, reconHeaderMap);
-                      reconRows = reconRows.concat(extracted);
-                      // No stop logic for last table, runs till end of PDF
+                      processReconRows(remainingRows, reconHeaderMap, reconRows);
                   }
               } else {
-                  const { extracted } = processReconRows([row], reconHeaderMap!);
-                  reconRows = reconRows.concat(extracted);
+                  // Pass reconRows by reference
+                  processReconRows([row], reconHeaderMap!, reconRows);
               }
           }
         }
@@ -287,7 +279,6 @@ export default function PDFToExcelConverter() {
 
   // --- Helper: Parse Summary Row ---
   const parseSummaryRow = (row: string[]) => {
-    // Find last numeric looking value as Amount
     let amtIdx = -1;
     for (let i = row.length - 1; i >= 0; i--) {
         if (looksLikeAmount(row[i])) {
@@ -295,18 +286,13 @@ export default function PDFToExcelConverter() {
             break;
         }
     }
-    
-    if (amtIdx === -1) {
-        return { desc: row.join(' ').trim(), amt: '' };
-    }
-    
+    if (amtIdx === -1) return { desc: row.join(' ').trim(), amt: '' };
     const desc = row.slice(0, amtIdx).join(' ').trim();
     const amt = row[amtIdx];
     return { desc, amt };
   };
 
   // --- Helper Functions ---
-
   const cleanData = (data: string[][]): string[][] => {
     return data.filter((row, index) => {
       if (index === 0) return true;
@@ -318,24 +304,16 @@ export default function PDFToExcelConverter() {
 
   const extractRawRows = (items: any[]): string[][] => {
     const rows = new Map<number, any[]>();
-    
     items.forEach(item => {
       if (!('str' in item) || !item.str.trim()) return;
       const yKey = Math.round(item.transform[5] / 5) * 5; 
       if (!rows.has(yKey)) rows.set(yKey, []);
-      rows.get(yKey)!.push({
-        text: item.str,
-        x: item.transform[4]
-      });
+      rows.get(yKey)!.push({ text: item.str, x: item.transform[4] });
     });
 
     return Array.from(rows.entries())
       .sort((a, b) => b[0] - a[0])
-      .map(entry => 
-        entry[1]
-          .sort((a, b) => a.x - b.x)
-          .map(item => item.text)
-      );
+      .map(entry => entry[1].sort((a, b) => a.x - b.x).map(item => item.text));
   };
 
   const detectHeaderRow = (row: string[], config: any[], threshold: number): { [key: string]: number } | null => {
@@ -354,9 +332,7 @@ export default function PDFToExcelConverter() {
       }
     });
 
-    if (foundCount >= threshold) {
-      return map;
-    }
+    if (foundCount >= threshold) return map;
     return null;
   };
 
@@ -368,18 +344,16 @@ export default function PDFToExcelConverter() {
 
   const isEmpty = (val: string) => !val || val.trim() === '';
 
-  // --- EXACT Logic for Table 1 (Prepay) ---
-  const processPrepayRows = (rows: string[][], map: { [key: string]: number }): { extracted: string[][], stop: boolean } => {
-    const extracted: string[][] = [];
+  // --- UPDATED Logic for Table 1 (Prepay) ---
+  // Now accepts 'extractedAccumulator' to maintain state across pages
+  const processPrepayRows = (rows: string[][], map: { [key: string]: number }, extractedAccumulator: string[][]): { stop: boolean } => {
 
     for (const row of rows) {
       const rowText = row.join(' ').toLowerCase();
       
       if (rowText.includes('reconciliation for prior month')) {
           const hasNumbers = row.some(cell => looksLikeAmount(cell));
-          if (!hasNumbers) {
-             return { extracted, stop: true };
-          }
+          if (!hasNumbers) return { stop: true };
       }
 
       const newRow = PREPAY_TARGET_HEADERS.map(header => {
@@ -405,55 +379,54 @@ export default function PDFToExcelConverter() {
         const val = newRow[colIndex];
 
         if (val.toLowerCase().includes('week')) {
-            extracted.push(newRow);
+            extractedAccumulator.push(newRow);
             continue;
         }
 
-        // Amount column is 4
         if (colIndex !== 4 && looksLikeAmount(val)) {
             const fixedRow = ['', '', '', '', val]; 
-            extracted.push(fixedRow);
+            extractedAccumulator.push(fixedRow);
             continue;
         }
 
         if (colIndex === 0) {
-            if (extracted.length > 0) {
-                const lastRow = extracted[extracted.length - 1];
+            // Check Accumulator Length
+            if (extractedAccumulator.length > 0) {
+                const lastRow = extractedAccumulator[extractedAccumulator.length - 1];
                 lastRow[0] = (lastRow[0] + ' ' + val).replace(/\s+/g, ' ').trim();
             } else {
-                extracted.push(newRow);
+                extractedAccumulator.push(newRow);
             }
             continue;
         }
 
         if (colIndex === 4) {
-            extracted.push(newRow);
+            extractedAccumulator.push(newRow);
             continue;
         }
         
-        extracted.push(newRow);
+        extractedAccumulator.push(newRow);
         continue;
       }
 
       // --- MULTI-VALUE ROWS ---
       const areAllButAmountEmpty = isEmpty(newRow[0]) && isEmpty(newRow[1]) && isEmpty(newRow[2]) && isEmpty(newRow[3]);
       if (areAllButAmountEmpty && !isEmpty(newRow[4])) {
-          extracted.push(newRow);
+          extractedAccumulator.push(newRow);
           continue;
       }
 
-      extracted.push(newRow);
+      extractedAccumulator.push(newRow);
     }
 
-    return { extracted, stop: false };
+    return { stop: false };
   };
 
-  // --- EXACT Logic for Table 2 (Recon) ---
-  const processReconRows = (rows: string[][], map: { [key: string]: number }): { extracted: string[][], stop: boolean } => {
-    const extracted: string[][] = [];
+  // --- UPDATED Logic for Table 2 (Recon) ---
+  // Now accepts 'extractedAccumulator' to maintain state across pages
+  const processReconRows = (rows: string[][], map: { [key: string]: number }, extractedAccumulator: string[][]): { stop: boolean } => {
 
     for (const row of rows) {
-      // Typically no stop phrase for the last table, but good to have structure
       const rowText = row.join(' ').toLowerCase();
 
       const newRow = RECON_TARGET_HEADERS.map(header => {
@@ -479,51 +452,50 @@ export default function PDFToExcelConverter() {
         const val = newRow[colIndex];
 
         if (val.toLowerCase().includes('week')) {
-            extracted.push(newRow);
+            extractedAccumulator.push(newRow);
             continue;
         }
 
-        // Amount column is 6 for Recon
         if (colIndex !== 6 && looksLikeAmount(val)) {
-            const fixedRow = ['', '', '', '', '', '', val]; // 7 cols
-            extracted.push(fixedRow);
+            const fixedRow = ['', '', '', '', '', '', val]; 
+            extractedAccumulator.push(fixedRow);
             continue;
         }
 
         if (colIndex === 0) {
-            if (extracted.length > 0) {
-                const lastRow = extracted[extracted.length - 1];
+            // Check Accumulator Length
+            if (extractedAccumulator.length > 0) {
+                const lastRow = extractedAccumulator[extractedAccumulator.length - 1];
                 lastRow[0] = (lastRow[0] + ' ' + val).replace(/\s+/g, ' ').trim();
             } else {
-                extracted.push(newRow);
+                extractedAccumulator.push(newRow);
             }
             continue;
         }
 
         if (colIndex === 6) {
-            extracted.push(newRow);
+            extractedAccumulator.push(newRow);
             continue;
         }
         
-        extracted.push(newRow);
+        extractedAccumulator.push(newRow);
         continue;
       }
 
       // --- MULTI-VALUE ROWS ---
-      // Check if all but Amount (index 6) are empty
       const areAllButAmountEmpty = newRow.every((cell, index) => {
           return index === 6 ? true : isEmpty(cell);
       });
 
       if (areAllButAmountEmpty && !isEmpty(newRow[6])) {
-          extracted.push(newRow);
+          extractedAccumulator.push(newRow);
           continue;
       }
 
-      extracted.push(newRow);
+      extractedAccumulator.push(newRow);
     }
 
-    return { extracted, stop: false };
+    return { stop: false };
   };
 
 
@@ -544,7 +516,6 @@ export default function PDFToExcelConverter() {
     const wb = XLSX.utils.book_new();
     
     const currencyFormat = '"$"#,##0.00';
-    const numberFormat = '#,##0';
 
     // --- Sheet 0: Summary ---
     if (summaryData.length > 0) {
@@ -644,7 +615,7 @@ export default function PDFToExcelConverter() {
           </div>
           <h1 className="text-4xl md:text-6xl font-bold mb-4 tracking-tight text-white">
             PDF to Excel<br />
-            <span className="text-[var(--neon-blue)] text-glow">Variable Invoice</span>
+            <span className="text-[var(--neon-blue)] text-glow">Fleet Invoice</span>
           </h1>
           <p className="text-slate-300 text-lg max-w-xl mx-auto">
             Extracts Summary, Pre-payment Details, and Recon tables sequentially.
