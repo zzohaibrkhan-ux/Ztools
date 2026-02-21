@@ -88,37 +88,38 @@ export default function PDFToExcelConverter() {
 
       const numPages = pdf.numPages;
       
-      // --- STATE MACHINE ---
-      // Phases: summary_1 -> summary_2 -> summary_3 -> prepay -> recon -> done
+      // State variables
       let mode = 'search_summary_1';
       
-      // Data Buffers
-      let summaryRows: string[][] = [];
       let prepayRows: string[][] = [];
       let reconRows: string[][] = [];
+      let summaryRows: string[][] = [];
       
-      // Temporary buffers for specific tables
+      let prepayHeaderMap: { [key: string]: number } | null = null;
+      let foundPrepayHeader = false;
+      let stopPrepayProcessing = false;
+
+      let reconHeaderMap: { [key: string]: number } | null = null;
+      let foundReconHeader = false;
+
+      // Buffers for Summary tables
       let summaryTable1: string[][] = [];
       let summaryTable2: string[][] = [];
       let summaryTable3: string[][] = [];
 
-      // Header Maps
-      let prepayHeaderMap: { [key: string]: number } | null = null;
-      let reconHeaderMap: { [key: string]: number } | null = null;
-
-      updateProgress(10, `Phase 1: Processing Summary...`);
+      updateProgress(5, `Phase 1: Processing Summary...`);
 
       for (let i = 1; i <= numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         
-        // Update progress based on mode
-        if (mode.startsWith('search_summary') || mode.startsWith('extract_summary')) {
-            updateProgress(10 + (i / numPages) * 30, `Phase 1: Scanning Summary (Page ${i})...`);
+        // Dynamic Progress Update
+        if (mode.startsWith('summary') || mode.startsWith('extract_sum')) {
+            updateProgress(5 + (i / numPages) * 25, `Phase 1: Summary (Page ${i})...`);
         } else if (mode === 'prepay') {
-            updateProgress(40 + (i / numPages) * 30, `Phase 2: Pre-payment Details (Page ${i})...`);
+            updateProgress(30 + (i / numPages) * 35, `Phase 2: Pre-payment Details (Page ${i})...`);
         } else if (mode === 'recon') {
-            updateProgress(70 + (i / numPages) * 20, `Phase 3: Recon Details (Page ${i})...`);
+            updateProgress(65 + (i / numPages) * 30, `Phase 3: Recon Details (Page ${i})...`);
         }
         
         const rawRows = extractRawRows(textContent.items);
@@ -127,29 +128,23 @@ export default function PDFToExcelConverter() {
           const row = rawRows[r];
           const rowText = row.join(' ').toLowerCase();
 
-          // --- SUMMARY LOGIC ---
-          
-          // 1. Search Summary Table 1
+          // --- 1. SUMMARY PROCESSING ---
           if (mode === 'search_summary_1') {
-             if (rowText.includes('prepayment for current month')) {
-                 mode = 'extract_summary_1';
-                 // Add header for Summary Table 1
-                 summaryTable1.push(['PREPAYMENT FOR CURRENT MONTH', 'Amount']);
-             }
-          }
-          // Extract Summary Table 1
+            if (rowText.includes('prepayment for current month')) {
+                mode = 'extract_summary_1';
+                summaryTable1.push(['PREPAYMENT FOR CURRENT MONTH', 'Amount']);
+            }
+          } 
           else if (mode === 'extract_summary_1') {
              if (rowText.includes('reconciliation for prior month')) {
                  // Finish Table 1, Start Table 2
                  mode = 'extract_summary_2';
                  summaryTable2.push(['RECONCILIATION FOR PRIOR MONTH', 'Amount']);
              } else {
-                 // Capture data: assume first part is desc, last part is amount
                  const { desc, amt } = parseSummaryRow(row);
                  if (desc || amt) summaryTable1.push([desc, amt]);
              }
           }
-          // Extract Summary Table 2
           else if (mode === 'extract_summary_2') {
               if (rowText.includes('total')) {
                   // Finish Table 2, Start Table 3
@@ -160,77 +155,89 @@ export default function PDFToExcelConverter() {
                   if (desc || amt) summaryTable2.push([desc, amt]);
               }
           }
-          // Extract Summary Table 3
           else if (mode === 'extract_summary_3') {
               if (rowText.includes('invoice')) {
-                  // Finish Summary Phase, move to Prepay
-                  mode = 'prepay'; 
+                  // Finish Summary Phase completely, move to Prepay
+                  mode = 'prepay';
                   
-                  // Compile Summary Sheet
+                  // Compile Summary Sheet with gaps
                   summaryRows = [...summaryTable1];
                   summaryRows.push([], []); // Gap
                   summaryRows = summaryRows.concat(summaryTable2);
                   summaryRows.push([], []); // Gap
                   summaryRows = summaryRows.concat(summaryTable3);
+                  
               } else {
                   const { desc, amt } = parseSummaryRow(row);
                   if (desc || amt) summaryTable3.push([desc, amt]);
               }
           }
 
-          // --- DETAILED TABLES LOGIC ---
-
-          // Pre-pay Processing
+          // --- 2. PREPAY PROCESSING (Preserved Logic) ---
           else if (mode === 'prepay') {
-              if (!prepayHeaderMap) {
-                  const map = detectHeaderRow(row, PREPAY_HEADER_CONFIG, 4);
-                  if (map) {
-                      prepayHeaderMap = map;
-                      prepayRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Monthly Rate', 'Prepaid Amount']);
-                      continue;
-                  }
-              }
-              
-              if (prepayHeaderMap) {
-                  const { extracted, stop } = processPrepayRows([row], prepayHeaderMap);
-                  prepayRows = prepayRows.concat(extracted);
-                  if (stop) {
-                      mode = 'recon';
-                      prepayHeaderMap = null; // Reset for safety
-                  }
-              }
+            if (stopPrepayProcessing) {
+                // If stopped, we skip to next logic check (Recon search)
+            } else {
+                if (!foundPrepayHeader) {
+                    const detectedMap = detectHeaderRow(row, PREPAY_HEADER_CONFIG, 4);
+                    if (detectedMap) {
+                        prepayHeaderMap = detectedMap;
+                        foundPrepayHeader = true;
+                        
+                        prepayRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Monthly Rate', 'Prepaid Amount']);
+                        
+                        const remainingRows = rawRows.slice(r + 1);
+                        const { extracted, stop } = processPrepayRows(remainingRows, prepayHeaderMap);
+                        prepayRows = prepayRows.concat(extracted);
+                        if(stop) {
+                            stopPrepayProcessing = true;
+                            mode = 'recon'; // Switch to recon immediately
+                        }
+                        continue; // Continue to next row in loop (though we sliced, loop continues for next page iteration mostly)
+                    }
+                } else {
+                    const { extracted, stop } = processPrepayRows([row], prepayHeaderMap!);
+                    prepayRows = prepayRows.concat(extracted);
+                    if(stop) {
+                        stopPrepayProcessing = true;
+                        mode = 'recon';
+                    }
+                }
+            }
           }
 
-          // Recon Processing
-          else if (mode === 'recon') {
-              if (!reconHeaderMap) {
-                  const map = detectHeaderRow(row, RECON_HEADER_CONFIG, 5);
-                  if (map) {
-                      reconHeaderMap = map;
+          // --- 3. RECON PROCESSING (Preserved Logic) ---
+          // Note: We search for recon header regardless of 'mode' once prepay is done, 
+          // or strictly follow mode='recon'
+          if (mode === 'recon') {
+              if (!foundReconHeader) {
+                  const detectedMap = detectHeaderRow(row, RECON_HEADER_CONFIG, 5);
+                  if (detectedMap) {
+                      reconHeaderMap = detectedMap;
+                      foundReconHeader = true;
+                      
                       reconRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Actual Quantity', 'Reconciled Quantity', 'Monthly Rate', 'Reconciliation Amount']);
-                      continue;
+                      
+                      const remainingRows = rawRows.slice(r + 1);
+                      const { extracted } = processReconRows(remainingRows, reconHeaderMap);
+                      reconRows = reconRows.concat(extracted);
+                      // No stop logic for last table, runs till end of PDF
                   }
-              }
-
-              if (reconHeaderMap) {
-                  const { extracted } = processReconRows([row], reconHeaderMap);
+              } else {
+                  const { extracted } = processReconRows([row], reconHeaderMap!);
                   reconRows = reconRows.concat(extracted);
               }
           }
         }
-        
-        // Optimization: If we are done with everything, we could break, 
-        // but usually we scan whole doc just in case. Keeping loop for safety.
       }
 
-      updateProgress(90, 'Finalizing data...');
+      updateProgress(95, 'Finalizing data...');
 
       // --- Finalize Data ---
       
       let isAnyStructured = false;
 
       if (summaryRows.length > 0) {
-        // Clean summary rows? usually not needed for summary.
         setSummaryData(summaryRows);
         isAnyStructured = true;
       }
@@ -248,7 +255,7 @@ export default function PDFToExcelConverter() {
       }
 
       if (!isAnyStructured) {
-         throw new Error('No tables found. Please check PDF structure.');
+         throw new Error('No tables found. Please check PDF headers.');
       }
 
       setIsStructured(isAnyStructured);
@@ -261,7 +268,6 @@ export default function PDFToExcelConverter() {
                          prepayRows.reduce((s, r) => s + r.length, 0) + 
                          reconRows.reduce((s, r) => s + r.length, 0);
 
-      // Tables count: Summary counts as 1 (containing 3 parts) + Prepay + Recon
       setStats({ 
         pages: numPages, 
         tables: (summaryRows.length > 0 ? 1 : 0) + (prepayRows.length > 1 ? 1 : 0) + (reconRows.length > 1 ? 1 : 0), 
@@ -281,7 +287,7 @@ export default function PDFToExcelConverter() {
 
   // --- Helper: Parse Summary Row ---
   const parseSummaryRow = (row: string[]) => {
-    // Simple logic: Last numeric looking value is Amount, rest is Description
+    // Find last numeric looking value as Amount
     let amtIdx = -1;
     for (let i = row.length - 1; i >= 0; i--) {
         if (looksLikeAmount(row[i])) {
@@ -291,10 +297,10 @@ export default function PDFToExcelConverter() {
     }
     
     if (amtIdx === -1) {
-        return { desc: row.join(' '), amt: '' };
+        return { desc: row.join(' ').trim(), amt: '' };
     }
     
-    const desc = row.slice(0, amtIdx).join(' ');
+    const desc = row.slice(0, amtIdx).join(' ').trim();
     const amt = row[amtIdx];
     return { desc, amt };
   };
@@ -403,6 +409,7 @@ export default function PDFToExcelConverter() {
             continue;
         }
 
+        // Amount column is 4
         if (colIndex !== 4 && looksLikeAmount(val)) {
             const fixedRow = ['', '', '', '', val]; 
             extracted.push(fixedRow);
@@ -441,11 +448,12 @@ export default function PDFToExcelConverter() {
     return { extracted, stop: false };
   };
 
-  // --- Adapted Logic for Table 2 (Recon) ---
+  // --- EXACT Logic for Table 2 (Recon) ---
   const processReconRows = (rows: string[][], map: { [key: string]: number }): { extracted: string[][], stop: boolean } => {
     const extracted: string[][] = [];
 
     for (const row of rows) {
+      // Typically no stop phrase for the last table, but good to have structure
       const rowText = row.join(' ').toLowerCase();
 
       const newRow = RECON_TARGET_HEADERS.map(header => {
@@ -475,8 +483,9 @@ export default function PDFToExcelConverter() {
             continue;
         }
 
+        // Amount column is 6 for Recon
         if (colIndex !== 6 && looksLikeAmount(val)) {
-            const fixedRow = ['', '', '', '', '', '', val]; 
+            const fixedRow = ['', '', '', '', '', '', val]; // 7 cols
             extracted.push(fixedRow);
             continue;
         }
@@ -501,6 +510,7 @@ export default function PDFToExcelConverter() {
       }
 
       // --- MULTI-VALUE ROWS ---
+      // Check if all but Amount (index 6) are empty
       const areAllButAmountEmpty = newRow.every((cell, index) => {
           return index === 6 ? true : isEmpty(cell);
       });
@@ -516,6 +526,7 @@ export default function PDFToExcelConverter() {
     return { extracted, stop: false };
   };
 
+
   const updateProgress = (percent: number, status: string) => {
     setProgress(percent);
     setStatusText(status);
@@ -529,7 +540,7 @@ export default function PDFToExcelConverter() {
   };
 
   const downloadExcel = () => {
-    if (summaryData.length === 0 && prepayData.length === 0 && reconData.length === 0) return;
+    if (prepayData.length === 0 && reconData.length === 0 && summaryData.length === 0) return;
     const wb = XLSX.utils.book_new();
     
     const currencyFormat = '"$"#,##0.00';
@@ -538,7 +549,6 @@ export default function PDFToExcelConverter() {
     // --- Sheet 0: Summary ---
     if (summaryData.length > 0) {
         const wsSum = XLSX.utils.aoa_to_sheet(summaryData);
-        // Basic formatting for Summary
         wsSum['!cols'] = [{ wch: 40 }, { wch: 20 }];
         XLSX.utils.book_append_sheet(wb, wsSum, 'Summary');
     }
@@ -746,7 +756,7 @@ export default function PDFToExcelConverter() {
                 <h3 className="text-lg font-semibold text-white">Extraction Results</h3>
               </div>
 
-              {summaryData.length > 0 && (
+               {summaryData.length > 0 && (
                  <div className="mb-8">
                     <h4 className="text-md font-medium text-slate-300 mb-2 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-[var(--neon-yellow)]"></span>
