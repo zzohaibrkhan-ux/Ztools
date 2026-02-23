@@ -164,7 +164,17 @@ export default function PDFToExcelConverter() {
                  }
 
                  const { desc, rate, amt } = parseSummaryRow(row, sum1HeaderMap);
-                 if (desc || amt) summaryTable1.push([desc, rate, amt]);
+                 
+                 // LOGIC UPDATE: Check for continuation (description only)
+                 const isDescOnly = desc && isEmpty(rate) && isEmpty(amt);
+                 
+                 if (isDescOnly && summaryTable1.length > 1) {
+                     // Append to previous row's description
+                     const lastRow = summaryTable1[summaryTable1.length - 1];
+                     lastRow[0] = (lastRow[0] + ' ' + desc).trim();
+                 } else if (desc || rate || amt) {
+                     summaryTable1.push([desc, rate, amt]);
+                 }
              }
           }
           else if (mode === 'extract_summary_2') {
@@ -182,7 +192,16 @@ export default function PDFToExcelConverter() {
                  }
 
                   const { desc, rate, amt } = parseSummaryRow(row, sum2HeaderMap);
-                  if (desc || amt) summaryTable2.push([desc, rate, amt]);
+                  
+                  // LOGIC UPDATE: Check for continuation (description only)
+                  const isDescOnly = desc && isEmpty(rate) && isEmpty(amt);
+                  
+                  if (isDescOnly && summaryTable2.length > 1) {
+                      const lastRow = summaryTable2[summaryTable2.length - 1];
+                      lastRow[0] = (lastRow[0] + ' ' + desc).trim();
+                  } else if (desc || rate || amt) {
+                      summaryTable2.push([desc, rate, amt]);
+                  }
               }
           }
           else if (mode === 'extract_summary_3') {
@@ -197,7 +216,17 @@ export default function PDFToExcelConverter() {
                   
               } else {
                   const { desc, amt } = parseSummaryRow(row, null);
-                  if (desc || amt) summaryTable3.push([desc, amt]);
+                  
+                  // LOGIC UPDATE: Check for continuation (description only)
+                  // Note: Summary Table 3 usually has only Desc and Amt
+                  const isDescOnly = desc && isEmpty(amt);
+                  
+                  if (isDescOnly && summaryTable3.length > 1) {
+                      const lastRow = summaryTable3[summaryTable3.length - 1];
+                      lastRow[0] = (lastRow[0] + ' ' + desc).trim();
+                  } else if (desc || amt) {
+                      summaryTable3.push([desc, amt]);
+                  }
               }
           }
 
@@ -211,9 +240,6 @@ export default function PDFToExcelConverter() {
                         foundPrepayHeader = true;
                         
                         prepayRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Monthly Rate', 'Prepaid Amount']);
-                        
-                        // FIX: Do not process remaining rows here. 
-                        // Just continue to let the main loop handle the next rows.
                         continue; 
                     }
                 } else {
@@ -221,7 +247,6 @@ export default function PDFToExcelConverter() {
                     if(stop) {
                         stopPrepayProcessing = true;
                         mode = 'recon';
-                        // Do not continue; let the loop fall through to 'recon' logic immediately for this row
                     }
                 }
             }
@@ -236,9 +261,6 @@ export default function PDFToExcelConverter() {
                       foundReconHeader = true;
                       
                       reconRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Actual Quantity', 'Reconciled Quantity', 'Monthly Rate', 'Reconciliation Amount']);
-                      
-                      // FIX: Do not process remaining rows here.
-                      // Continue to let main loop handle next rows.
                       continue;
                   }
               } else {
