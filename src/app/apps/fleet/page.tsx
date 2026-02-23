@@ -51,6 +51,13 @@ export default function PDFToExcelConverter() {
   ];
   const RECON_TARGET_HEADERS = RECON_HEADER_CONFIG.map(h => h.key);
 
+  // --- Configuration Summary Tables ---
+  const SUMMARY_HEADER_CONFIG = [
+    { key: 'description', aliases: ['description', 'item', 'details'] },
+    { key: 'monthly rate', aliases: ['monthly rate', 'rate', 'monthly rate (per vehicle)', 'per vehicle'] },
+    { key: 'amount', aliases: ['amount', 'amt', 'total'] }
+  ];
+
   const loadPdfJs = useCallback(async () => {
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -91,7 +98,7 @@ export default function PDFToExcelConverter() {
       // State variables
       let mode = 'search_summary_1';
       
-      // Accumulator Arrays - Passed by reference to processing functions
+      // Accumulator Arrays
       let prepayRows: string[][] = [];
       let reconRows: string[][] = [];
       let summaryRows: string[][] = [];
@@ -103,10 +110,16 @@ export default function PDFToExcelConverter() {
       let reconHeaderMap: { [key: string]: number } | null = null;
       let foundReconHeader = false;
 
-      // Summary specific buffers
+      // Summary specific buffers and state
       let summaryTable1: string[][] = [];
       let summaryTable2: string[][] = [];
       let summaryTable3: string[][] = [];
+
+      let sum1HeaderMap: { [key: string]: number } | null = null;
+      let foundSum1Header = false;
+      
+      let sum2HeaderMap: { [key: string]: number } | null = null;
+      let foundSum2Header = false;
 
       updateProgress(5, `Phase 1: Processing Summary...`);
 
@@ -133,16 +146,26 @@ export default function PDFToExcelConverter() {
           if (mode === 'search_summary_1') {
             if (rowText.includes('prepayment for current month')) {
                 mode = 'extract_summary_1';
-                summaryTable1.push(['PREPAYMENT FOR CURRENT MONTH', 'Amount']);
+                summaryTable1.push(['PREPAYMENT FOR CURRENT MONTH', 'Monthly Rate (per vehicle)', 'Amount']);
             }
           } 
           else if (mode === 'extract_summary_1') {
              if (rowText.includes('reconciliation for prior month')) {
                  mode = 'extract_summary_2';
-                 summaryTable2.push(['RECONCILIATION FOR PRIOR MONTH', 'Amount']);
+                 summaryTable2.push(['RECONCILIATION FOR PRIOR MONTH', 'Monthly Rate (per vehicle)', 'Amount']);
              } else {
-                 const { desc, amt } = parseSummaryRow(row);
-                 if (desc || amt) summaryTable1.push([desc, amt]);
+                 // Try to detect header row for summary table 1
+                 if (!foundSum1Header) {
+                    const detectedMap = detectHeaderRow(row, SUMMARY_HEADER_CONFIG, 2);
+                    if (detectedMap) {
+                        sum1HeaderMap = detectedMap;
+                        foundSum1Header = true;
+                        continue; // Skip this header row
+                    }
+                 }
+
+                 const { desc, rate, amt } = parseSummaryRow(row, sum1HeaderMap);
+                 if (desc || amt) summaryTable1.push([desc, rate, amt]);
              }
           }
           else if (mode === 'extract_summary_2') {
@@ -150,8 +173,18 @@ export default function PDFToExcelConverter() {
                   mode = 'extract_summary_3';
                   summaryTable3.push(['TOTAL', 'Amount']);
               } else {
-                  const { desc, amt } = parseSummaryRow(row);
-                  if (desc || amt) summaryTable2.push([desc, amt]);
+                  // Try to detect header row for summary table 2
+                  if (!foundSum2Header) {
+                    const detectedMap = detectHeaderRow(row, SUMMARY_HEADER_CONFIG, 2);
+                    if (detectedMap) {
+                        sum2HeaderMap = detectedMap;
+                        foundSum2Header = true;
+                        continue; // Skip this header row
+                    }
+                 }
+
+                  const { desc, rate, amt } = parseSummaryRow(row, sum2HeaderMap);
+                  if (desc || amt) summaryTable2.push([desc, rate, amt]);
               }
           }
           else if (mode === 'extract_summary_3') {
@@ -165,7 +198,7 @@ export default function PDFToExcelConverter() {
                   summaryRows = summaryRows.concat(summaryTable3);
                   
               } else {
-                  const { desc, amt } = parseSummaryRow(row);
+                  const { desc, amt } = parseSummaryRow(row, null); // Total section usually simple
                   if (desc || amt) summaryTable3.push([desc, amt]);
               }
           }
@@ -181,7 +214,6 @@ export default function PDFToExcelConverter() {
                         
                         prepayRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Monthly Rate', 'Prepaid Amount']);
                         
-                        // Pass prepayRows by reference
                         const remainingRows = rawRows.slice(r + 1);
                         const { stop } = processPrepayRows(remainingRows, prepayHeaderMap, prepayRows);
                         if(stop) {
@@ -191,7 +223,6 @@ export default function PDFToExcelConverter() {
                         continue; 
                     }
                 } else {
-                    // Pass prepayRows by reference
                     const { stop } = processPrepayRows([row], prepayHeaderMap!, prepayRows);
                     if(stop) {
                         stopPrepayProcessing = true;
@@ -211,12 +242,10 @@ export default function PDFToExcelConverter() {
                       
                       reconRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Actual Quantity', 'Reconciled Quantity', 'Monthly Rate', 'Reconciliation Amount']);
                       
-                      // Pass reconRows by reference
                       const remainingRows = rawRows.slice(r + 1);
                       processReconRows(remainingRows, reconHeaderMap, reconRows);
                   }
               } else {
-                  // Pass reconRows by reference
                   processReconRows([row], reconHeaderMap!, reconRows);
               }
           }
@@ -278,18 +307,37 @@ export default function PDFToExcelConverter() {
   };
 
   // --- Helper: Parse Summary Row ---
-  const parseSummaryRow = (row: string[]) => {
-    let amtIdx = -1;
-    for (let i = row.length - 1; i >= 0; i--) {
-        if (looksLikeAmount(row[i])) {
-            amtIdx = i;
-            break;
-        }
+  // Updated to handle Map or Heuristic and return 3 columns
+  const parseSummaryRow = (row: string[], map: { [key: string]: number } | null) => {
+    if (map) {
+        // Mapped extraction
+        const desc = map['description'] !== undefined ? row[map['description']] : '';
+        const rate = map['monthly rate'] !== undefined ? row[map['monthly rate']] : '';
+        const amt = map['amount'] !== undefined ? row[map['amount']] : '';
+        return { desc: desc.trim(), rate: rate.trim(), amt: amt.trim() };
+    } 
+    
+    // Heuristic extraction (fallback)
+    // Find indices of all amounts
+    const amountIndices: number[] = [];
+    row.forEach((cell, index) => {
+        if (looksLikeAmount(cell)) amountIndices.push(index);
+    });
+
+    if (amountIndices.length === 0) {
+        return { desc: row.join(' ').trim(), rate: '', amt: '' };
     }
-    if (amtIdx === -1) return { desc: row.join(' ').trim(), amt: '' };
-    const desc = row.slice(0, amtIdx).join(' ').trim();
+    
+    const amtIdx = amountIndices[amountIndices.length - 1]; // Last amount
+    const rateIdx = amountIndices.length > 1 ? amountIndices[amountIndices.length - 2] : -1; // Second to last amount
+    
     const amt = row[amtIdx];
-    return { desc, amt };
+    const rate = rateIdx !== -1 ? row[rateIdx] : '';
+    
+    // Description is everything before the identified numbers
+    const desc = row.slice(0, rateIdx !== -1 ? rateIdx : amtIdx).join(' ').trim();
+    
+    return { desc, rate, amt };
   };
 
   // --- Helper Functions ---
@@ -344,8 +392,7 @@ export default function PDFToExcelConverter() {
 
   const isEmpty = (val: string) => !val || val.trim() === '';
 
-  // --- UPDATED Logic for Table 1 (Prepay) ---
-  // Now accepts 'extractedAccumulator' to maintain state across pages
+  // --- Logic for Table 1 (Prepay) ---
   const processPrepayRows = (rows: string[][], map: { [key: string]: number }, extractedAccumulator: string[][]): { stop: boolean } => {
 
     for (const row of rows) {
@@ -422,8 +469,7 @@ export default function PDFToExcelConverter() {
     return { stop: false };
   };
 
-  // --- UPDATED Logic for Table 2 (Recon) ---
-  // Now accepts 'extractedAccumulator' to maintain state across pages
+  // --- Logic for Table 2 (Recon) ---
   const processReconRows = (rows: string[][], map: { [key: string]: number }, extractedAccumulator: string[][]): { stop: boolean } => {
 
     for (const row of rows) {
@@ -520,7 +566,7 @@ export default function PDFToExcelConverter() {
     // --- Sheet 0: Summary ---
     if (summaryData.length > 0) {
         const wsSum = XLSX.utils.aoa_to_sheet(summaryData);
-        wsSum['!cols'] = [{ wch: 40 }, { wch: 20 }];
+        wsSum['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 20 }];
         XLSX.utils.book_append_sheet(wb, wsSum, 'Summary');
     }
 
