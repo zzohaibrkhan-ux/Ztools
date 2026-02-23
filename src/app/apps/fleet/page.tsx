@@ -154,13 +154,12 @@ export default function PDFToExcelConverter() {
                  mode = 'extract_summary_2';
                  summaryTable2.push(['RECONCILIATION FOR PRIOR MONTH', 'Monthly Rate (per vehicle)', 'Amount']);
              } else {
-                 // Try to detect header row for summary table 1
                  if (!foundSum1Header) {
                     const detectedMap = detectHeaderRow(row, SUMMARY_HEADER_CONFIG, 2);
                     if (detectedMap) {
                         sum1HeaderMap = detectedMap;
                         foundSum1Header = true;
-                        continue; // Skip this header row
+                        continue;
                     }
                  }
 
@@ -173,13 +172,12 @@ export default function PDFToExcelConverter() {
                   mode = 'extract_summary_3';
                   summaryTable3.push(['TOTAL', 'Amount']);
               } else {
-                  // Try to detect header row for summary table 2
                   if (!foundSum2Header) {
                     const detectedMap = detectHeaderRow(row, SUMMARY_HEADER_CONFIG, 2);
                     if (detectedMap) {
                         sum2HeaderMap = detectedMap;
                         foundSum2Header = true;
-                        continue; // Skip this header row
+                        continue;
                     }
                  }
 
@@ -198,7 +196,7 @@ export default function PDFToExcelConverter() {
                   summaryRows = summaryRows.concat(summaryTable3);
                   
               } else {
-                  const { desc, amt } = parseSummaryRow(row, null); // Total section usually simple
+                  const { desc, amt } = parseSummaryRow(row, null);
                   if (desc || amt) summaryTable3.push([desc, amt]);
               }
           }
@@ -307,18 +305,14 @@ export default function PDFToExcelConverter() {
   };
 
   // --- Helper: Parse Summary Row ---
-  // Updated to handle Map or Heuristic and return 3 columns
   const parseSummaryRow = (row: string[], map: { [key: string]: number } | null) => {
     if (map) {
-        // Mapped extraction
         const desc = map['description'] !== undefined ? row[map['description']] : '';
         const rate = map['monthly rate'] !== undefined ? row[map['monthly rate']] : '';
         const amt = map['amount'] !== undefined ? row[map['amount']] : '';
         return { desc: desc.trim(), rate: rate.trim(), amt: amt.trim() };
     } 
     
-    // Heuristic extraction (fallback)
-    // Find indices of all amounts
     const amountIndices: number[] = [];
     row.forEach((cell, index) => {
         if (looksLikeAmount(cell)) amountIndices.push(index);
@@ -328,13 +322,12 @@ export default function PDFToExcelConverter() {
         return { desc: row.join(' ').trim(), rate: '', amt: '' };
     }
     
-    const amtIdx = amountIndices[amountIndices.length - 1]; // Last amount
-    const rateIdx = amountIndices.length > 1 ? amountIndices[amountIndices.length - 2] : -1; // Second to last amount
+    const amtIdx = amountIndices[amountIndices.length - 1];
+    const rateIdx = amountIndices.length > 1 ? amountIndices[amountIndices.length - 2] : -1;
     
     const amt = row[amtIdx];
     const rate = rateIdx !== -1 ? row[rateIdx] : '';
     
-    // Description is everything before the identified numbers
     const desc = row.slice(0, rateIdx !== -1 ? rateIdx : amtIdx).join(' ').trim();
     
     return { desc, rate, amt };
@@ -342,11 +335,43 @@ export default function PDFToExcelConverter() {
 
   // --- Helper Functions ---
   const cleanData = (data: string[][]): string[][] => {
-    return data.filter((row, index) => {
-      if (index === 0) return true;
+    // List of descriptions to exclude (lowercase)
+    const invalidDescriptions = [
+      'invoice', 'invoice*', 'description', 'quantity', 'rate', 
+      'monthly', 'prepaid', 'reconciled', 'actual', 'active', 'days'
+    ];
+
+    // 1. Sanitize cells: Replace Page* or Invoice* with blank
+    const sanitizedData = data.map((row, index) => {
+      if (index === 0) return row; // Keep header as is
+      
+      return row.map(cell => {
+        const lowerCell = cell.toLowerCase().trim();
+        // Check for Page* or Invoice*
+        if (lowerCell.startsWith('page') || lowerCell.startsWith('invoice')) {
+            return '';
+        }
+        return cell;
+      });
+    });
+
+    // 2. Filter rows
+    return sanitizedData.filter((row, index) => {
+      if (index === 0) return true; // Always keep header
+      
       const hasContent = row.some(cell => cell.trim() !== '');
+      if (!hasContent) return false;
+
       const isTotalRow = row[0]?.toLowerCase().includes('total');
-      return hasContent && !isTotalRow;
+      if (isTotalRow) return false;
+
+      // Check if description (first column) matches invalid keywords exactly
+      const descriptionCell = row[0]?.toLowerCase().trim();
+      if (invalidDescriptions.includes(descriptionCell)) {
+          return false;
+      }
+      
+      return true;
     });
   };
 
@@ -437,7 +462,6 @@ export default function PDFToExcelConverter() {
         }
 
         if (colIndex === 0) {
-            // Check Accumulator Length
             if (extractedAccumulator.length > 0) {
                 const lastRow = extractedAccumulator[extractedAccumulator.length - 1];
                 lastRow[0] = (lastRow[0] + ' ' + val).replace(/\s+/g, ' ').trim();
@@ -509,7 +533,6 @@ export default function PDFToExcelConverter() {
         }
 
         if (colIndex === 0) {
-            // Check Accumulator Length
             if (extractedAccumulator.length > 0) {
                 const lastRow = extractedAccumulator[extractedAccumulator.length - 1];
                 lastRow[0] = (lastRow[0] + ' ' + val).replace(/\s+/g, ' ').trim();
