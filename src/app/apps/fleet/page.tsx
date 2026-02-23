@@ -212,12 +212,8 @@ export default function PDFToExcelConverter() {
                         
                         prepayRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Monthly Rate', 'Prepaid Amount']);
                         
-                        const remainingRows = rawRows.slice(r + 1);
-                        const { stop } = processPrepayRows(remainingRows, prepayHeaderMap, prepayRows);
-                        if(stop) {
-                            stopPrepayProcessing = true;
-                            mode = 'recon';
-                        }
+                        // FIX: Do not process remaining rows here. 
+                        // Just continue to let the main loop handle the next rows.
                         continue; 
                     }
                 } else {
@@ -225,6 +221,7 @@ export default function PDFToExcelConverter() {
                     if(stop) {
                         stopPrepayProcessing = true;
                         mode = 'recon';
+                        // Do not continue; let the loop fall through to 'recon' logic immediately for this row
                     }
                 }
             }
@@ -240,8 +237,9 @@ export default function PDFToExcelConverter() {
                       
                       reconRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Actual Quantity', 'Reconciled Quantity', 'Monthly Rate', 'Reconciliation Amount']);
                       
-                      const remainingRows = rawRows.slice(r + 1);
-                      processReconRows(remainingRows, reconHeaderMap, reconRows);
+                      // FIX: Do not process remaining rows here.
+                      // Continue to let main loop handle next rows.
+                      continue;
                   }
               } else {
                   processReconRows([row], reconHeaderMap!, reconRows);
