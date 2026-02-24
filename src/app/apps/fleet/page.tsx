@@ -12,6 +12,17 @@ interface Stats {
   cells: number;
 }
 
+// Helper interface for coordinate mapping
+interface CellItem {
+  text: string;
+  x: number;
+}
+
+interface ColumnLayout {
+  key: string;
+  x: number;
+}
+
 export default function PDFToExcelConverter() {
   const [view, setView] = useState<ViewState>('upload');
   const [fileInfo, setFileInfo] = useState<{ name: string; size: string } | null>(null);
@@ -40,6 +51,7 @@ export default function PDFToExcelConverter() {
   const PREPAY_TARGET_HEADERS = PREPAY_HEADER_CONFIG.map(h => h.key);
 
   // --- Configuration Table 2: Prior Month Recon ---
+  // FIX: Added more aliases for 'reconciliation amount' to ensure header detection
   const RECON_HEADER_CONFIG = [
     { key: 'description', aliases: ['description', 'desc'] },
     { key: 'active days', aliases: ['active days', 'days'] },
@@ -47,7 +59,7 @@ export default function PDFToExcelConverter() {
     { key: 'actual quantity', aliases: ['actual', 'actual quantity'] },
     { key: 'reconciled quantity', aliases: ['reconciled', 'reconciled quantity'] },
     { key: 'monthly rate', aliases: ['monthly rate', 'rate'] },
-    { key: 'reconciliation amount', aliases: ['reconciliation', 'reconciliation amount'] }
+    { key: 'reconciliation amount', aliases: ['reconciliation', 'reconciliation amount', 'recon amount', 'amount'] }
   ];
   const RECON_TARGET_HEADERS = RECON_HEADER_CONFIG.map(h => h.key);
 
@@ -103,11 +115,11 @@ export default function PDFToExcelConverter() {
       let reconRows: string[][] = [];
       let summaryRows: string[][] = [];
       
-      let prepayHeaderMap: { [key: string]: number } | null = null;
+      let prepayLayout: ColumnLayout[] | null = null;
       let foundPrepayHeader = false;
       let stopPrepayProcessing = false;
 
-      let reconHeaderMap: { [key: string]: number } | null = null;
+      let reconLayout: ColumnLayout[] | null = null;
       let foundReconHeader = false;
 
       // Summary specific buffers and state
@@ -115,10 +127,10 @@ export default function PDFToExcelConverter() {
       let summaryTable2: string[][] = [];
       let summaryTable3: string[][] = [];
 
-      let sum1HeaderMap: { [key: string]: number } | null = null;
+      let sum1Layout: ColumnLayout[] | null = null;
       let foundSum1Header = false;
       
-      let sum2HeaderMap: { [key: string]: number } | null = null;
+      let sum2Layout: ColumnLayout[] | null = null;
       let foundSum2Header = false;
 
       updateProgress(5, `Phase 1: Processing Summary...`);
@@ -136,11 +148,12 @@ export default function PDFToExcelConverter() {
             updateProgress(65 + (i / numPages) * 30, `Phase 3: Recon Details (Page ${i})...`);
         }
         
+        // UPDATED: Extract rows WITH coordinates
         const rawRows = extractRawRows(textContent.items);
 
         for (let r = 0; r < rawRows.length; r++) {
-          const row = rawRows[r];
-          const rowText = row.join(' ').toLowerCase();
+          const row = rawRows[r]; // This is now CellItem[]
+          const rowText = row.map(c => c.text).join(' ').toLowerCase();
 
           // --- 1. SUMMARY PROCESSING ---
           if (mode === 'search_summary_1') {
@@ -155,21 +168,19 @@ export default function PDFToExcelConverter() {
                  summaryTable2.push(['RECONCILIATION FOR PRIOR MONTH', 'Monthly Rate (per vehicle)', 'Amount']);
              } else {
                  if (!foundSum1Header) {
-                    const detectedMap = detectHeaderRow(row, SUMMARY_HEADER_CONFIG, 2);
-                    if (detectedMap) {
-                        sum1HeaderMap = detectedMap;
+                    const detectedLayout = detectHeaderRow(row, SUMMARY_HEADER_CONFIG, 2);
+                    if (detectedLayout) {
+                        sum1Layout = detectedLayout;
                         foundSum1Header = true;
                         continue;
                     }
                  }
 
-                 const { desc, rate, amt } = parseSummaryRow(row, sum1HeaderMap);
+                 const { desc, rate, amt } = parseSummaryRow(row, sum1Layout);
                  
-                 // LOGIC UPDATE: Check for continuation (description only)
                  const isDescOnly = desc && isEmpty(rate) && isEmpty(amt);
                  
                  if (isDescOnly && summaryTable1.length > 1) {
-                     // Append to previous row's description
                      const lastRow = summaryTable1[summaryTable1.length - 1];
                      lastRow[0] = (lastRow[0] + ' ' + desc).trim();
                  } else if (desc || rate || amt) {
@@ -183,17 +194,16 @@ export default function PDFToExcelConverter() {
                   summaryTable3.push(['TOTAL', 'Amount']);
               } else {
                   if (!foundSum2Header) {
-                    const detectedMap = detectHeaderRow(row, SUMMARY_HEADER_CONFIG, 2);
-                    if (detectedMap) {
-                        sum2HeaderMap = detectedMap;
+                    const detectedLayout = detectHeaderRow(row, SUMMARY_HEADER_CONFIG, 2);
+                    if (detectedLayout) {
+                        sum2Layout = detectedLayout;
                         foundSum2Header = true;
                         continue;
                     }
                  }
 
-                  const { desc, rate, amt } = parseSummaryRow(row, sum2HeaderMap);
+                  const { desc, rate, amt } = parseSummaryRow(row, sum2Layout);
                   
-                  // LOGIC UPDATE: Check for continuation (description only)
                   const isDescOnly = desc && isEmpty(rate) && isEmpty(amt);
                   
                   if (isDescOnly && summaryTable2.length > 1) {
@@ -217,8 +227,6 @@ export default function PDFToExcelConverter() {
               } else {
                   const { desc, amt } = parseSummaryRow(row, null);
                   
-                  // LOGIC UPDATE: Check for continuation (description only)
-                  // Note: Summary Table 3 usually has only Desc and Amt
                   const isDescOnly = desc && isEmpty(amt);
                   
                   if (isDescOnly && summaryTable3.length > 1) {
@@ -234,16 +242,16 @@ export default function PDFToExcelConverter() {
           else if (mode === 'prepay') {
             if (!stopPrepayProcessing) {
                 if (!foundPrepayHeader) {
-                    const detectedMap = detectHeaderRow(row, PREPAY_HEADER_CONFIG, 4);
-                    if (detectedMap) {
-                        prepayHeaderMap = detectedMap;
+                    const detectedLayout = detectHeaderRow(row, PREPAY_HEADER_CONFIG, 4);
+                    if (detectedLayout) {
+                        prepayLayout = detectedLayout;
                         foundPrepayHeader = true;
                         
                         prepayRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Monthly Rate', 'Prepaid Amount']);
                         continue; 
                     }
                 } else {
-                    const { stop } = processPrepayRows([row], prepayHeaderMap!, prepayRows);
+                    const { stop } = processPrepayRows([row], prepayLayout!, prepayRows);
                     if(stop) {
                         stopPrepayProcessing = true;
                         mode = 'recon';
@@ -255,16 +263,16 @@ export default function PDFToExcelConverter() {
           // --- 3. RECON PROCESSING ---
           if (mode === 'recon') {
               if (!foundReconHeader) {
-                  const detectedMap = detectHeaderRow(row, RECON_HEADER_CONFIG, 5);
-                  if (detectedMap) {
-                      reconHeaderMap = detectedMap;
+                  const detectedLayout = detectHeaderRow(row, RECON_HEADER_CONFIG, 5);
+                  if (detectedLayout) {
+                      reconLayout = detectedLayout;
                       foundReconHeader = true;
                       
                       reconRows.push(['Description', 'Active Days', 'Prepaid Quantity', 'Actual Quantity', 'Reconciled Quantity', 'Monthly Rate', 'Reconciliation Amount']);
                       continue;
                   }
               } else {
-                  processReconRows([row], reconHeaderMap!, reconRows);
+                  processReconRows([row], reconLayout!, reconRows);
               }
           }
         }
@@ -324,79 +332,115 @@ export default function PDFToExcelConverter() {
     }
   };
 
+  // --- Helper: Map Row using Coordinates ---
+  const mapRowToLayout = (rowItems: CellItem[], layout: ColumnLayout[], targetHeaders: string[]): string[] => {
+    const result = targetHeaders.map(() => '');
+    
+    if (!layout || layout.length === 0) return result;
+
+    // Sort layout by X to calculate boundaries
+    const sortedLayout = [...layout].sort((a, b) => a.x - b.x);
+
+    // Calculate boundaries (midpoints between headers)
+    const boundaries: { key: string, min: number, max: number }[] = sortedLayout.map((col, i) => {
+        const prevX = i > 0 ? sortedLayout[i-1].x : -Infinity;
+        const nextX = i < sortedLayout.length - 1 ? sortedLayout[i+1].x : Infinity;
+        
+        const lowerBound = prevX === -Infinity ? -Infinity : (prevX + col.x) / 2;
+        const upperBound = nextX === Infinity ? Infinity : (col.x + nextX) / 2;
+
+        return { key: col.key, min: lowerBound, max: upperBound };
+    });
+
+    // Assign text items to columns
+    rowItems.forEach(item => {
+        // Find the column boundary this item falls into
+        const match = boundaries.find(b => item.x >= b.min && item.x < b.max);
+        if (match) {
+            const targetIndex = targetHeaders.indexOf(match.key);
+            if (targetIndex !== -1) {
+                // Append text if multiple items fall in the same column (rare but possible)
+                result[targetIndex] = (result[targetIndex] + ' ' + item.text).trim();
+            }
+        }
+    });
+
+    return result;
+  };
+
   // --- Helper: Parse Summary Row ---
-  const parseSummaryRow = (row: string[], map: { [key: string]: number } | null) => {
-    if (map) {
-        const desc = map['description'] !== undefined ? row[map['description']] : '';
-        const rate = map['monthly rate'] !== undefined ? row[map['monthly rate']] : '';
-        const amt = map['amount'] !== undefined ? row[map['amount']] : '';
-        return { desc: desc.trim(), rate: rate.trim(), amt: amt.trim() };
+  const parseSummaryRow = (row: CellItem[], layout: ColumnLayout[] | null) => {
+    if (layout) {
+        // Use coordinate mapping if layout exists
+        const mapped = mapRowToLayout(row, layout, ['description', 'monthly rate', 'amount']);
+        return { 
+            desc: mapped[0].trim(), 
+            rate: mapped[1].trim(), 
+            amt: mapped[2].trim() 
+        };
     } 
     
+    // Fallback: Heuristic parsing (for Table 3 or if no header found)
+    const texts = row.map(c => c.text);
     const amountIndices: number[] = [];
-    row.forEach((cell, index) => {
+    texts.forEach((cell, index) => {
         if (looksLikeAmount(cell)) amountIndices.push(index);
     });
 
     if (amountIndices.length === 0) {
-        return { desc: row.join(' ').trim(), rate: '', amt: '' };
+        return { desc: texts.join(' ').trim(), rate: '', amt: '' };
     }
     
     const amtIdx = amountIndices[amountIndices.length - 1];
     const rateIdx = amountIndices.length > 1 ? amountIndices[amountIndices.length - 2] : -1;
     
-    const amt = row[amtIdx];
-    const rate = rateIdx !== -1 ? row[rateIdx] : '';
+    const amt = texts[amtIdx];
+    const rate = rateIdx !== -1 ? texts[rateIdx] : '';
     
-    const desc = row.slice(0, rateIdx !== -1 ? rateIdx : amtIdx).join(' ').trim();
+    const desc = texts.slice(0, rateIdx !== -1 ? rateIdx : amtIdx).join(' ').trim();
     
     return { desc, rate, amt };
   };
 
   // --- Helper Functions ---
   const cleanData = (data: string[][]): string[][] => {
-    // List of descriptions to exclude (lowercase)
     const invalidDescriptions = [
       'invoice', 'invoice*', 'description', 'quantity', 'rate', 
       'monthly', 'prepaid', 'reconciled', 'actual', 'active', 'days'
     ];
 
-    // 1. Sanitize cells: Replace Page* or Invoice* with blank
     const sanitizedData = data.map((row, index) => {
-      if (index === 0) return row; // Keep header as is
-      
+      if (index === 0) return row;
       return row.map(cell => {
         const lowerCell = cell.toLowerCase().trim();
-        // Check for Page* or Invoice*
-        if (lowerCell.startsWith('page') || lowerCell.startsWith('invoice')) {
-            return '';
-        }
+        if (lowerCell.startsWith('page') || lowerCell.startsWith('invoice')) return '';
         return cell;
       });
     });
 
-    // 2. Filter rows
     return sanitizedData.filter((row, index) => {
-      if (index === 0) return true; // Always keep header
+      if (index === 0) return true;
       
+      // FIX: Check if row is completely blank (including empty strings after trim)
+      const isCompletelyBlank = row.every(cell => cell.trim() === '');
+      if (isCompletelyBlank) return false;
+
       const hasContent = row.some(cell => cell.trim() !== '');
       if (!hasContent) return false;
-
+      
       const isTotalRow = row[0]?.toLowerCase().includes('total');
       if (isTotalRow) return false;
-
-      // Check if description (first column) matches invalid keywords exactly
+      
       const descriptionCell = row[0]?.toLowerCase().trim();
-      if (invalidDescriptions.includes(descriptionCell)) {
-          return false;
-      }
+      if (invalidDescriptions.includes(descriptionCell)) return false;
       
       return true;
     });
   };
 
-  const extractRawRows = (items: any[]): string[][] => {
-    const rows = new Map<number, any[]>();
+  // UPDATED: Returns items with X coordinates
+  const extractRawRows = (items: any[]): CellItem[][] => {
+    const rows = new Map<number, CellItem[]>();
     items.forEach(item => {
       if (!('str' in item) || !item.str.trim()) return;
       const yKey = Math.round(item.transform[5] / 5) * 5; 
@@ -406,26 +450,28 @@ export default function PDFToExcelConverter() {
 
     return Array.from(rows.entries())
       .sort((a, b) => b[0] - a[0])
-      .map(entry => entry[1].sort((a, b) => a.x - b.x).map(item => item.text));
+      .map(entry => entry[1].sort((a, b) => a.x - b.x));
   };
 
-  const detectHeaderRow = (row: string[], config: any[], threshold: number): { [key: string]: number } | null => {
-    const lowerRow = row.map(cell => cell.toLowerCase());
-    const map: { [key: string]: number } = {};
-    let foundCount = 0;
-
+  // UPDATED: Returns layout with X coordinates
+  const detectHeaderRow = (row: CellItem[], config: any[], threshold: number): ColumnLayout[] | null => {
+    const layout: ColumnLayout[] = [];
+    
     config.forEach(headerConfig => {
+      // Check for aliases in the row
       for (const alias of headerConfig.aliases) {
-        const index = lowerRow.findIndex(cellText => cellText.includes(alias));
-        if (index !== -1) {
-          map[headerConfig.key] = index;
-          foundCount++;
-          break; 
+        const item = row.find(r => r.text.toLowerCase().includes(alias));
+        if (item) {
+            // Ensure we don't add duplicate keys if multiple aliases match
+            if (!layout.find(l => l.key === headerConfig.key)) {
+                layout.push({ key: headerConfig.key, x: item.x });
+            }
+            break; 
         }
       }
     });
 
-    if (foundCount >= threshold) return map;
+    if (layout.length >= threshold) return layout;
     return null;
   };
 
@@ -438,20 +484,18 @@ export default function PDFToExcelConverter() {
   const isEmpty = (val: string) => !val || val.trim() === '';
 
   // --- Logic for Table 1 (Prepay) ---
-  const processPrepayRows = (rows: string[][], map: { [key: string]: number }, extractedAccumulator: string[][]): { stop: boolean } => {
+  const processPrepayRows = (rows: CellItem[][], layout: ColumnLayout[], extractedAccumulator: string[][]): { stop: boolean } => {
 
     for (const row of rows) {
-      const rowText = row.join(' ').toLowerCase();
+      const rowText = row.map(c => c.text).join(' ').toLowerCase();
       
       if (rowText.includes('reconciliation for prior month')) {
-          const hasNumbers = row.some(cell => looksLikeAmount(cell));
+          const hasNumbers = row.some(c => looksLikeAmount(c.text));
           if (!hasNumbers) return { stop: true };
       }
 
-      const newRow = PREPAY_TARGET_HEADERS.map(header => {
-        const idx = map[header]; 
-        return (idx !== undefined && row[idx]) ? row[idx].trim() : '';
-      });
+      // UPDATED: Use coordinate mapping
+      const newRow = mapRowToLayout(row, layout, PREPAY_TARGET_HEADERS);
 
       const nonEmptyIndices: number[] = [];
       newRow.forEach((cell, index) => {
@@ -514,15 +558,13 @@ export default function PDFToExcelConverter() {
   };
 
   // --- Logic for Table 2 (Recon) ---
-  const processReconRows = (rows: string[][], map: { [key: string]: number }, extractedAccumulator: string[][]): { stop: boolean } => {
+  const processReconRows = (rows: CellItem[][], layout: ColumnLayout[], extractedAccumulator: string[][]): { stop: boolean } => {
 
     for (const row of rows) {
-      const rowText = row.join(' ').toLowerCase();
+      const rowText = row.map(c => c.text).join(' ').toLowerCase();
 
-      const newRow = RECON_TARGET_HEADERS.map(header => {
-        const idx = map[header]; 
-        return (idx !== undefined && row[idx]) ? row[idx].trim() : '';
-      });
+      // UPDATED: Use coordinate mapping
+      const newRow = mapRowToLayout(row, layout, RECON_TARGET_HEADERS);
 
       const nonEmptyIndices: number[] = [];
       newRow.forEach((cell, index) => {
@@ -767,7 +809,7 @@ export default function PDFToExcelConverter() {
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-[var(--neon-purple)]/20 flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-[var(--neon-purple)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2v-5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
