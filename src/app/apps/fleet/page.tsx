@@ -51,7 +51,6 @@ export default function PDFToExcelConverter() {
   const PREPAY_TARGET_HEADERS = PREPAY_HEADER_CONFIG.map(h => h.key);
 
   // --- Configuration Table 2: Prior Month Recon ---
-  // FIX: Added more aliases for 'reconciliation amount' to ensure header detection
   const RECON_HEADER_CONFIG = [
     { key: 'description', aliases: ['description', 'desc'] },
     { key: 'active days', aliases: ['active days', 'days'] },
@@ -655,18 +654,57 @@ export default function PDFToExcelConverter() {
         XLSX.utils.book_append_sheet(wb, wsSum, 'Summary');
     }
 
+    // --- Logic: Filter specific rows for Excel export ---
+    const keywordsToDelete = ['invoice', 'invoice*', 'description', 'quantity', 'rate', 'monthly', 'prepaid', 'reconciled', 'actual', 'active', 'days'];
+
+    const filterExcelRows = (data: string[][]): string[][] => {
+      if (!data || data.length <= 1) return data;
+      
+      const header = data[0];
+      const rows = data.slice(1);
+
+      const filteredRows = rows.filter(row => {
+        // Check if every cell in the row matches the deletion criteria
+        const shouldDelete = row.every(cell => {
+            const val = String(cell).trim().toLowerCase();
+            // Check if blank
+            if (val === '') return true;
+            // Check if 0 (string "0" or numeric 0)
+            if (!isNaN(Number(val)) && Number(val) === 0) return true;
+            // Check if it matches one of the keywords
+            if (keywordsToDelete.includes(val)) return true;
+            
+            return false;
+        });
+        
+        return !shouldDelete;
+      });
+
+      return [header, ...filteredRows];
+    };
+
     // --- Sheet 1: Pre-payment Details ---
     if (prepayData.length > 0) {
-      const ws1 = XLSX.utils.aoa_to_sheet(prepayData);
-      formatSheet(ws1, prepayData[0].length, [1, 2], [3, 4]); 
-      XLSX.utils.book_append_sheet(wb, ws1, 'Pre-payment Details');
+      // Apply filter
+      const finalPrepayData = filterExcelRows(prepayData);
+      
+      if (finalPrepayData.length > 1) {
+        const ws1 = XLSX.utils.aoa_to_sheet(finalPrepayData);
+        formatSheet(ws1, finalPrepayData[0].length, [1, 2], [3, 4]); 
+        XLSX.utils.book_append_sheet(wb, ws1, 'Pre-payment Details');
+      }
     }
 
     // --- Sheet 2: Prior Month Recon ---
     if (reconData.length > 0) {
-      const ws2 = XLSX.utils.aoa_to_sheet(reconData);
-      formatSheet(ws2, reconData[0].length, [1, 2, 3, 4], [5, 6]); 
-      XLSX.utils.book_append_sheet(wb, ws2, 'Prior Month Recon');
+      // Apply filter
+      const finalReconData = filterExcelRows(reconData);
+      
+      if (finalReconData.length > 1) {
+        const ws2 = XLSX.utils.aoa_to_sheet(finalReconData);
+        formatSheet(ws2, finalReconData[0].length, [1, 2, 3, 4], [5, 6]); 
+        XLSX.utils.book_append_sheet(wb, ws2, 'Prior Month Recon');
+      }
     }
 
     const fileName = fileInfo?.name.replace('.pdf', '') || 'document';
