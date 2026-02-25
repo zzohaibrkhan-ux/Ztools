@@ -63,6 +63,13 @@ const apps = [
     href: "/apps/fleet",
     color: "#fe131f"
   },
+  {
+    title: "Amazon Scorecard",
+    desc: "Generate Amazon Scorecards",
+    icon: "🔢",
+    href: "/apps/scorecard",
+    color: "#fe13ea"
+  },
 ];
 
 export default function Home() {
