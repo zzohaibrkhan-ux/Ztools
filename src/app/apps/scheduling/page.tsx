@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 // 1. UTILITY FUNCTIONS
 // ============================================
 
-// Helper to determine if a word is "Bad" data (DSP, Numeric, Blank)
+// Helper to determine if a word is "Bad" data (DSP, Numeric, Blank, or Rider+Standard Parcel)
 const isDefaultExcluded = (word) => {
   // 1. Check Blank
   if (word === '__BLANK__') return true;
@@ -21,6 +21,12 @@ const isDefaultExcluded = (word) => {
 
   // 3. Check DSP Initiated
   if (word.toLowerCase().startsWith('dsp initiated work')) return true;
+
+  // 4. Check if cell contains both "Rider" and "Standard Parcel"
+  const lowerWord = word.toLowerCase();
+  if (lowerWord.includes('rider') && lowerWord.includes('standard parcel')) {
+    return true;
+  }
 
   return false;
 };
@@ -291,7 +297,7 @@ const FilterConfigModal = ({
           </div>
           
           <p className="text-xs text-slate-500 italic">
-            Note: Items like "DSP Initiated Work", Numbers, and Blanks are unchecked by default.
+            Note: Items like "DSP Initiated Work", "Rider + Standard Parcel", Numbers, and Blanks are unchecked by default.
           </p>
         </div>
 
@@ -350,6 +356,10 @@ const UploadZone = ({ onFilesSelected, isDragging, setIsDragging }) => {
     </motion.div>
   );
 };
+
+const Trash2 = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+);
 
 const FileCard = ({ fileData, onRemove, onOpenSettings }) => (
   <motion.div
@@ -411,11 +421,6 @@ const FileCard = ({ fileData, onRemove, onOpenSettings }) => (
   </motion.div>
 );
 
-// Added Trash2 import to fix missing import error in original snippet logic
-const Trash2 = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-);
-
 // ============================================
 // 3. MAIN PAGE
 // ============================================
@@ -470,6 +475,7 @@ export default function Home() {
         sortedWords.forEach(word => {
           if (newState[word] === undefined) {
             // Check if it's a "bad" type to set default unchecked
+            // This uses the updated isDefaultExcluded function
             newState[word] = !isDefaultExcluded(word);
           }
         });

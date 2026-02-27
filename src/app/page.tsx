@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { X, MessageSquare, ExternalLink } from 'lucide-react';
+import { X, MessageSquare, ExternalLink, Search } from 'lucide-react'; // Added Search Icon
 
 // DUMMY DATA
 const apps = [
@@ -70,11 +70,19 @@ const apps = [
     href: "/apps/scorecard",
     color: "#fe13ea"
   },
+  {
+    title: "Amazon Training Report",
+    desc: "Generate Amazon Training Reports",
+    icon: "🎓",
+    href: "/apps/training",
+    color: "#1336fe"
+  },
 ];
 
 export default function Home() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(""); // New State for Search
 
   useEffect(() => {
     const showTimer = setTimeout(() => {
@@ -97,10 +105,16 @@ export default function Home() {
     setIsModalOpen(true);
   };
 
+  // Filter Logic
+  const filteredApps = apps.filter((app) =>
+    app.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    app.desc.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <main className="min-h-screen relative flex flex-col items-center justify-center p-8 overflow-hidden">
 
-      {/* Background Elements - Updated colors to match Nexus Theme */}
+      {/* Background Elements */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#0a0a1a]" />
@@ -121,7 +135,7 @@ export default function Home() {
       </div>
 
       {/* Header */}
-      <div className="relative z-10 text-center mb-16">
+      <div className="relative z-10 text-center mb-12">
         <motion.div
           initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -136,56 +150,107 @@ export default function Home() {
         </motion.div>
       </div>
 
-      {/* App Grid - Replaced AppCard with custom Link implementation */}
-      <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl">
-        {apps.map((app, index) => {
-          const isExternal = app.href.startsWith('http');
-          
-          const CardContent = (
-            <>
-              <div className="text-4xl mb-4">{app.icon}</div>
-              <h3 className="text-xl font-bold text-white mb-2">{app.title}</h3>
-              <p className="text-slate-400 text-sm mb-4 flex-grow">{app.desc}</p>
-              
-              <div className="flex items-center gap-2 text-sm font-medium mt-auto" style={{ color: app.color }}>
-                <span>Open App</span>
-                {isExternal && <ExternalLink size={14} />}
-              </div>
-              
-              {/* Accent Border Bottom */}
-              <div 
-                className="absolute bottom-0 left-0 w-full h-1 rounded-b-2xl transition-all duration-300 opacity-0 group-hover:opacity-100"
-                style={{ background: app.color, boxShadow: `0 0 10px ${app.color}` }} 
-              />
-            </>
-          );
-
-          return (
-            <motion.div
-              key={app.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+      {/* Interactive Search Bar */}
+      <motion.div 
+        className="relative z-10 w-full max-w-2xl mb-12"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
+      >
+        <div className="glass flex items-center gap-3 px-5 py-3.5 rounded-xl border border-white/10 hover:border-white/20 focus-within:border-[var(--neon-blue)] transition-all duration-300 shadow-lg">
+          <Search size={20} className="text-slate-400 flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="Search apps by name or description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-transparent w-full outline-none text-white placeholder-slate-500 text-sm tracking-wide"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')} 
+              className="text-slate-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
             >
-              {isExternal ? (
-                <a
-                  href={app.href}
-                  className="glass block p-6 rounded-2xl border border-white/10 hover:border-white/40 transition-all duration-300 group h-full flex flex-col relative overflow-hidden"
+              <X size={16} />
+            </button>
+          )}
+        </div>
+      </motion.div>
+
+      {/* App Grid - Added layout prop for smooth animations */}
+      <motion.div 
+        layout 
+        className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl"
+      >
+        <AnimatePresence>
+          {filteredApps.length > 0 ? (
+            filteredApps.map((app, index) => {
+              const isExternal = app.href.startsWith('http');
+              
+              const CardContent = (
+                <>
+                  <div className="text-4xl mb-4">{app.icon}</div>
+                  <h3 className="text-xl font-bold text-white mb-2">{app.title}</h3>
+                  <p className="text-slate-400 text-sm mb-4 flex-grow">{app.desc}</p>
+                  
+                  <div className="flex items-center gap-2 text-sm font-medium mt-auto" style={{ color: app.color }}>
+                    <span>Open App</span>
+                    {isExternal && <ExternalLink size={14} />}
+                  </div>
+                  
+                  {/* Accent Border Bottom */}
+                  <div 
+                    className="absolute bottom-0 left-0 w-full h-1 rounded-b-2xl transition-all duration-300 opacity-0 group-hover:opacity-100"
+                    style={{ background: app.color, boxShadow: `0 0 10px ${app.color}` }} 
+                  />
+                </>
+              );
+
+              return (
+                <motion.div
+                  key={app.title}
+                  layout // Enables smooth position animation
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  {CardContent}
-                </a>
-              ) : (
-                <Link
-                  href={app.href}
-                  className="glass block p-6 rounded-2xl border border-white/10 hover:border-white/40 transition-all duration-300 group h-full flex flex-col relative overflow-hidden"
-                >
-                  {CardContent}
-                </Link>
-              )}
+                  {isExternal ? (
+                    <a
+                      href={app.href}
+                      className="glass block p-6 rounded-2xl border border-white/10 hover:border-white/40 transition-all duration-300 group h-full flex flex-col relative overflow-hidden"
+                    >
+                      {CardContent}
+                    </a>
+                  ) : (
+                    <Link
+                      href={app.href}
+                      className="glass block p-6 rounded-2xl border border-white/10 hover:border-white/40 transition-all duration-300 group h-full flex flex-col relative overflow-hidden"
+                    >
+                      {CardContent}
+                    </Link>
+                  )}
+                </motion.div>
+              );
+            })
+          ) : (
+            // No Results Fallback
+            <motion.div 
+              className="col-span-full text-center py-12"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <p className="text-slate-400 text-lg">No apps found matching <span className="text-[var(--neon-blue)] font-semibold">"{searchQuery}"</span></p>
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="mt-4 text-sm text-slate-500 hover:text-white transition-colors underline underline-offset-4"
+              >
+                Clear search
+              </button>
             </motion.div>
-          );
-        })}
-      </div>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
       {/* HUD Elements */}
       <motion.div
