@@ -9,7 +9,7 @@ import { X, MessageSquare, ExternalLink, Search } from 'lucide-react';
 const apps = [
   { title: "Amazon Scheduling", desc: "Excel scheduling data processor with dynamic filters.", icon: "📅", href: "/apps/scheduling", color: "#00f3ff" },
   { title: "Amazon Capacity Compiler", desc: "Compile capacity reliability Excel files.", icon: "📊", href: "/apps/capacity", color: "#bc13fe" },
-  { title: "WST Variable Compiler", desc: "Process and compile Service Details & Training reports.", icon: "📝", href: "https://kitboxpro.vercel.app/wstmerger", color: "#0aff10" },
+  { title: "WST Variable Compiler", desc: "Process and compile Service Details & Training reports.", icon: "📝", href: "/apps/wst", color: "#0aff10" },
   { title: "CSV Database", desc: "Secure file storage and sharing platform.", icon: "☁️", href: "#", color: "#44475a" },
   { title: "ADP Payroll", desc: "For making Payroll Analysis.", icon: "📈", href: "#", color: "#44475a" },
   { title: "PDF to Excel", desc: "Converts PDF to Excel", icon: "🔁", href: "/apps/pdftoexcel", color: "#00f3ff" },
