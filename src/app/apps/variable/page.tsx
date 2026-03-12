@@ -26,6 +26,7 @@ export default function PDFToExcelConverter() {
   const [extractedData, setExtractedData] = useState<string[][]>([]);
   const [stats, setStats] = useState<Stats>({ pages: 0, tables: 0, rows: 0, cells: 0 });
   const [errorMessage, setErrorMessage] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
   
   const [isStructured, setIsStructured] = useState(false);
 
@@ -47,14 +48,11 @@ export default function PDFToExcelConverter() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Helper to normalize date to MM/DD/YYYY
   const normalizeDate = (dateStr: string): string => {
     if (!dateStr) return '';
-    // Check for M/D/YYYY or MM/DD/YYYY
     const parts = dateStr.split('/');
     if (parts.length === 3) {
       const [month, day, year] = parts;
-      // Pad with leading zero if single digit
       const paddedMonth = month.padStart(2, '0');
       const paddedDay = day.padStart(2, '0');
       return `${paddedMonth}/${paddedDay}/${year}`;
@@ -74,6 +72,7 @@ export default function PDFToExcelConverter() {
     setProgress(0);
     setStatusText('Loading PDF file...');
     setIsStructured(false);
+    setIsCopied(false);
 
     try {
       const pdfjsLib = await loadPdfJs();
@@ -228,7 +227,6 @@ export default function PDFToExcelConverter() {
         const idx = map[header];
         let cellValue = row[idx] || '';
         
-        // Format date column
         if (header === 'date') {
           cellValue = normalizeDate(cellValue);
         }
@@ -281,6 +279,54 @@ export default function PDFToExcelConverter() {
     return isNaN(num) ? 0 : num;
   };
 
+  // --- UPDATED FUNCTION: Robust Copy to Clipboard ---
+  const copyToClipboard = () => {
+    if (extractedData.length === 0) return;
+
+    const tsvString = extractedData.map(row => row.join('\t')).join('\n');
+
+    // Primary method: Modern Async Clipboard API (Requires HTTPS or localhost)
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(tsvString).then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      }).catch(err => {
+        console.error('Modern clipboard API failed, trying fallback:', err);
+        fallbackCopy(tsvString);
+      });
+    } else {
+      // Fallback method: For HTTP or file:// protocols
+      fallbackCopy(tsvString);
+    }
+  };
+
+  const fallbackCopy = (text: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // Make the textarea out of viewport
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } else {
+        console.error('Fallback copy failed');
+      }
+    } catch (err) {
+      console.error('Fallback copy error:', err);
+    }
+
+    document.body.removeChild(textArea);
+  };
+
   const downloadExcel = () => {
     if (extractedData.length === 0) return;
     const wb = XLSX.utils.book_new();
@@ -290,20 +336,17 @@ export default function PDFToExcelConverter() {
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
     
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      // Date Column (Index 0)
       const dateCellAddress = XLSX.utils.encode_cell({ r: R, c: 0 });
       if (ws[dateCellAddress]) {
         const val = ws[dateCellAddress].v;
         const dateObj = new Date(val as string);
-        // Only format if it's a valid date
         if (!isNaN(dateObj.getTime())) {
-            ws[dateCellAddress].t = 'd'; // Set type to date
+            ws[dateCellAddress].t = 'd';
             ws[dateCellAddress].v = dateObj;
-            ws[dateCellAddress].z = shortDateFormat; // Set format mask
+            ws[dateCellAddress].z = shortDateFormat;
         }
       }
 
-      // Rate Column (Index 2)
       const rateCellAddress = XLSX.utils.encode_cell({ r: R, c: 2 });
       if (ws[rateCellAddress]) {
         const val = ws[rateCellAddress].v;
@@ -312,7 +355,6 @@ export default function PDFToExcelConverter() {
         ws[rateCellAddress].z = currencyFormat;
       }
 
-      // Quantity Column (Index 3)
       const qtyCellAddress = XLSX.utils.encode_cell({ r: R, c: 3 });
       if (ws[qtyCellAddress]) {
         const val = ws[qtyCellAddress].v;
@@ -320,7 +362,6 @@ export default function PDFToExcelConverter() {
         ws[qtyCellAddress].v = parseNumber(val as string);
       }
 
-      // Amount Column (Index 4)
       const amountCellAddress = XLSX.utils.encode_cell({ r: R, c: 4 });
       if (ws[amountCellAddress]) {
         const val = ws[amountCellAddress].v;
@@ -346,6 +387,7 @@ export default function PDFToExcelConverter() {
     setStats({ pages: 0, tables: 0, rows: 0, cells: 0 });
     setErrorMessage('');
     setIsStructured(false);
+    setIsCopied(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -533,6 +575,29 @@ export default function PDFToExcelConverter() {
                 </svg>
                 Download Excel File
               </button>
+
+              {/* Copy Button */}
+              <button 
+                onClick={copyToClipboard} 
+                className="px-6 py-4 rounded-xl font-medium glass border border-white/10 text-white hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+              >
+                {isCopied ? (
+                  <>
+                    <svg className="w-5 h-5 text-[var(--neon-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copy to Clipboard
+                  </>
+                )}
+              </button>
+
               <button onClick={resetApp} className="px-6 py-4 rounded-xl font-medium glass border border-white/10 text-white hover:bg-white/10 transition-colors">
                 Convert Another File
               </button>
